@@ -7,7 +7,9 @@
 | Dev server | `npx tsx watch src/index.ts` |
 | Build | `tsc && tsc-alias` |
 | Start | `node dist/index.js` |
+| DB generate | `npx prisma generate` |
 | DB migrate | `npx prisma migrate dev` |
+| DB seed | `npx prisma db seed` |
 | DB GUI | `npx prisma studio` |
 | Test | `npx vitest` |
 
@@ -55,16 +57,32 @@ How it works:
 
 ### 2. Prisma Configuration
 
-Prisma uses **new config format** (Prisma 7.x+):
+Prisma 7.x+ uses new config format:
 
-- **Config file**: `prisma.config.ts` (not `schema.prisma` env block)
-- **Client output**: `generated/prisma/` (custom location, not node_modules)
-- **Env loading**: Config file imports `dotenv/config` explicitly
-- **Generate command**: `npx prisma generate` creates client at `generated/prisma/`
+**Files:**
+- `prisma.config.ts` - Config (env vars, migrations, seed)
+- `prisma/schema.prisma` - Models only (no env block)
+- `src/lib/prisma.ts` - Client singleton with adapter
 
-Import pattern:
+**Environment:**
+- `DATABASE_URL` - Pooled connection (app queries)
+- `DIRECT_URL` - Direct connection (migrations only)
+
+**Commands:**
+```bash
+npx prisma generate      # Generate client after schema changes
+npx prisma migrate dev   # Create and apply migrations
+npx prisma db seed       # Run seed.ts manually
+npx prisma studio       # GUI at localhost:5555
+```
+
+**Import:**
 ```typescript
-import { PrismaClient } from '../generated/prisma/index.js'
+import { PrismaClient } from '../../generated/prisma/client.js'
+import { PrismaPg } from '@prisma/adapter-pg'
+
+const adapter = new PrismaPg({ connectionString: env.DATABASE_URL })
+const client = new PrismaClient({ adapter })
 ```
 
 ### 3. TypeScript Strictness
