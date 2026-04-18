@@ -51,6 +51,8 @@ How it works:
 - **Production**: `tsc-alias` rewrites aliases to relative paths during build
 - **Testing**: `vitest.config.ts` handles alias resolution
 
+**Exception**: Config files loaded by external tools (Prisma CLI, etc.) must use relative imports because those tools do not resolve TypeScript path aliases.
+
 ### 2. Prisma Configuration
 
 Prisma uses **new config format** (Prisma 7.x+):
