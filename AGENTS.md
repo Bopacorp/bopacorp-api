@@ -4,9 +4,9 @@
 
 | Task | Command |
 |------|---------|
-| Dev server | `npx tsx watch src/server.ts` |
+| Dev server | `npx tsx watch src/index.ts` |
 | Build | `tsc && tsc-alias` |
-| Start | `node dist/server.js` |
+| Start | `node dist/index.js` |
 | DB migrate | `npx prisma migrate dev` |
 | DB GUI | `npx prisma studio` |
 | Test | `npx vitest` |
@@ -92,10 +92,17 @@ src/
 
 ### 5. Environment Requirements
 
-Copy `.env.example` to `.env`. Required:
-- `DATABASE_URL`: PostgreSQL connection string (Supabase recommended)
+Copy `.env.example` to `.env`.
+
+**Required:**
+- `DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: Min 32 chars (`openssl rand -base64 32`)
+
+**Optional (with defaults):**
 - `PORT`: Server port (default: 3000)
+- `NODE_ENV`: Environment (default: development)
+- `LOG_LEVEL`: Pino log level (default: info)
+- `LOG_PRETTY`: Pretty logs in dev (default: false)
 
 ### 6. Testing
 
