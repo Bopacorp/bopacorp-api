@@ -13,5 +13,5 @@
   "[json]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "biome.lspBin": "./node_modules/.bin/biome"
+  "biome.lsp.bin": "./node_modules/.bin/biome"
 }
