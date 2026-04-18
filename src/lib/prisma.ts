@@ -1,10 +1,18 @@
-// Run 'npx prisma generate' to generate the client before using this file
-// import { PrismaClient } from '../../generated/prisma/index.js';
+import { env } from '@config/env.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../generated/prisma/client.js';
 
-// const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const globalForDb = global as unknown as { db: PrismaClient };
 
-// export const prisma = globalForPrisma.prisma || new PrismaClient();
+const adapter = new PrismaPg({
+  connectionString: env.DATABASE_URL,
+});
 
-// if (process.env['NODE_ENV'] !== 'production') globalForPrisma.prisma = prisma;
+export const db =
+  globalForDb.db ||
+  new PrismaClient({
+    adapter,
+    log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  });
 
-export {};
+if (env.NODE_ENV !== 'production') globalForDb.db = db;
