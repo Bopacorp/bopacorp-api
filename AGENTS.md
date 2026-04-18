@@ -22,10 +22,10 @@
 - **Import syntax**: Always use `.js` extensions in imports, even for `.ts` files
   ```typescript
   // Correct
-  import { foo } from './lib/prisma.js'
-  
+  import { foo } from './lib/db.js'
+
   // Wrong (will fail)
-  import { foo } from './lib/prisma'
+  import { foo } from './lib/db'
   ```
 
 ### Path Aliases
@@ -62,7 +62,7 @@ Prisma 7.x+ uses new config format:
 **Files:**
 - `prisma.config.ts` - Config (env vars, migrations, seed)
 - `prisma/schema.prisma` - Models only (no env block)
-- `src/lib/prisma.ts` - Client singleton with adapter
+- `src/lib/db.ts` - Database client singleton
 
 **Environment:**
 - `DATABASE_URL` - Pooled connection (app queries)
@@ -106,7 +106,7 @@ src/
 │   ├── middleware/         # Auth, roles, error handlers
 │   ├── utils/
 │   └── types/
-├── lib/prisma.ts           # Prisma client singleton
+├── lib/db.ts               # Database client singleton
 └── index.ts                # Entry point
 ```
 
