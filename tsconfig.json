@@ -6,13 +6,11 @@
     "outDir": "./dist",
 
     // Path Aliases
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
-      "@config/*": ["src/config/*"],
-      "@lib/*": ["src/lib/*"],
-      "@modules/*": ["src/modules/*"],
-      "@shared/*": ["src/shared/*"]
+      "@config/*": ["./src/config/*"],
+      "@lib/*": ["./src/lib/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@shared/*": ["./src/shared/*"],
     },
 
     // Environment Settings
@@ -50,8 +48,8 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 }
