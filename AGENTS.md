@@ -87,6 +87,34 @@ Copy `.env.example` to `.env`. Required:
 - **ORM**: Prisma with PostgreSQL
 - **Uploads**: Local dev → Supabase Storage (prod)
 
+## Coding Standards
+
+### No Emojis in Code
+
+**All code files must be emoji-free.** This includes comments, strings, log messages, and documentation within source files.
+
+```typescript
+// ❌ Wrong
+console.log('✅ User created successfully')
+throw new Error('❌ Invalid input')
+
+// ✅ Correct
+console.log('User created successfully')
+throw new Error('Invalid input')
+```
+
+Emojis belong in:
+- Commit messages
+- Markdown documentation (README, AGENTS.md)
+- CI/CD output logs
+- Terminal scripts (pre-commit hooks, etc.)
+
+Not in:
+- TypeScript/JavaScript source files
+- Test files
+- Configuration files (JSON, YAML)
+- Database strings or API responses
+
 ## Common Issues
 
 **Error**: `Cannot find module '../generated/prisma'`
