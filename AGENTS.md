@@ -4,9 +4,9 @@
 
 | Task | Command |
 |------|---------|
-| Dev server | `npx tsx watch src/index.ts` |
-| Build | `tsc` |
-| Start | `node dist/index.js` |
+| Dev server | `npx tsx watch src/server.ts` |
+| Build | `tsc && tsc-alias` |
+| Start | `node dist/server.js` |
 | DB migrate | `npx prisma migrate dev` |
 | DB GUI | `npx prisma studio` |
 | Test | `npx vitest` |
@@ -25,6 +25,31 @@
   // Wrong (will fail)
   import { foo } from './lib/prisma'
   ```
+
+### Path Aliases
+
+Use path aliases instead of relative imports:
+
+```typescript
+// ❌ Wrong - Relative imports
+import { logger } from '../../config/logger.js'
+import { AppError } from '../../../shared/errors/AppError.js'
+
+// ✅ Correct - Path aliases
+import { logger } from '@config/logger.js'
+import { AppError } from '@shared/errors/AppError.js'
+```
+
+Available aliases:
+- `@config/*` → `src/config/*`
+- `@lib/*` → `src/lib/*`
+- `@modules/*` → `src/modules/*`
+- `@shared/*` → `src/shared/*`
+
+How it works:
+- **Development**: `tsx` resolves aliases automatically from `tsconfig.json`
+- **Production**: `tsc-alias` rewrites aliases to relative paths during build
+- **Testing**: `vitest.config.ts` handles alias resolution
 
 ### 2. Prisma Configuration
 
@@ -86,8 +111,64 @@ Copy `.env.example` to `.env`. Required:
 - **Validation**: Zod schemas per module
 - **ORM**: Prisma with PostgreSQL
 - **Uploads**: Local dev → Supabase Storage (prod)
+- **Logging**: Pino (JSON in prod, pretty in dev)
 
 ## Coding Standards
+
+### English Only
+
+**All code must be written in English.** This includes:
+- Variable names
+- Function names
+- Class names
+- File names
+- Error messages
+- Log messages
+- Database field names
+- API endpoint names
+
+```typescript
+// ❌ Wrong
+const usuario = await findUsuarioById(id)
+const fechaCreacion = new Date()
+throw new Error('Usuario no encontrado')
+
+// ✅ Correct
+const user = await findUserById(id)
+const createdAt = new Date()
+throw new Error('User not found')
+```
+
+### No Comments - Self-Explanatory Code
+
+**Code must be self-explanatory. No comments allowed.**
+
+If you feel the need to add a comment, refactor the code instead:
+- Extract to a named function
+- Rename variables for clarity
+- Use early returns
+- Simplify logic
+
+```typescript
+// ❌ Wrong (needs comment)
+// Check if user is active and has permission
+if (u.status === 1 && u.perms.includes('admin')) {
+  // ...
+}
+
+// ✅ Correct (self-explanatory)
+const isActive = user.status === 'active'
+const hasAdminPermission = user.permissions.includes('admin')
+
+if (isActive && hasAdminPermission) {
+  // ...
+}
+```
+
+**Exceptions** (very rare):
+- External links or references
+- Legal requirements
+- Complex mathematical formulas
 
 ### No Emojis in Code
 
