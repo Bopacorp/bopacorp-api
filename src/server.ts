@@ -1,5 +1,6 @@
 import { env } from '@config/env.js';
 import { logger } from '@lib/logger.js';
+import { HttpError } from '@shared/errors/http-error.js';
 import { errorHandler } from '@shared/middleware/error-handler.js';
 import cors from 'cors';
 import express from 'express';
@@ -29,6 +30,10 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     env: env.NODE_ENV,
   });
+});
+
+app.use((req, _res) => {
+  throw new HttpError(404, `${req.method} ${req.path} not found`, 'ROUTE_NOT_FOUND');
 });
 
 app.use(errorHandler);
