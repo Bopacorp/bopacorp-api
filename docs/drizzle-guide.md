@@ -5,7 +5,7 @@ Standard rules for working with Drizzle in this project. All team members and AI
 ## Overview
 
 - **ORM**: Drizzle ORM with `node-postgres` driver
-- **DB**: PostgreSQL (multi-schema: `auth`, `core`, `catalog`, `employability`)
+- **DB**: PostgreSQL (multi-schema: `app_auth`, `core`, `catalog`, `employability`)
 - **Schema location**: `src/db/schema/` (one file per PostgreSQL schema + one shared `relations.ts`)
 - **Migrations**: `drizzle/` (SQL files + journal tracked in git, snapshots ignored)
 - **Config**: `drizzle.config.ts` at project root
@@ -14,7 +14,7 @@ Standard rules for working with Drizzle in this project. All team members and AI
 
 ```
 src/db/schema/
-├── auth.ts              # pgSchema('auth') — 9 tables, 4 enums
+├── auth.ts              # pgSchema('app_auth') — 9 tables, 4 enums
 ├── core.ts              # pgSchema('core') — 2 tables
 ├── catalog.ts           # pgSchema('catalog') — 20 tables
 ├── employability.ts     # pgSchema('employability') — 4 tables, 1 enum

@@ -87,11 +87,11 @@ Very strict settings. Common gotchas:
 src/
 ├── config/env.ts              # Zod-validated environment
 ├── db/schema/                 # Drizzle schema definitions
-│   ├── auth.ts                # auth schema (9 tables, 4 enums)
+│   ├── auth.ts                # app_auth schema (9 tables, 4 enums)
 │   ├── core.ts                # core schema (2 tables)
 │   ├── catalog.ts             # catalog schema (20 tables)
 │   ├── employability.ts       # employability schema (4 tables, 1 enum)
-│   ├── relations.ts           # All relations (auth + core + catalog + employability)
+│   ├── relations.ts           # All relations (app_auth + core + catalog + employability)
 │   └── index.ts               # Barrel export
 ├── lib/
 │   ├── db.ts                  # Database client singleton
@@ -158,7 +158,7 @@ Source SQL lives in `models/*.sql`. Each SQL file maps to one Drizzle schema fil
 
 | SQL file | Drizzle file | PostgreSQL schema |
 |----------|-------------|-------------------|
-| `01_auth_rbac.sql` | `auth.ts` | `auth` |
+| `01_auth_rbac.sql` | `auth.ts` | `app_auth` |
 | `02_profiles.sql` | `core.ts` | `core` |
 | `04_catalog.sql` | `catalog.ts` | `catalog` |
 | `07_employability.sql` | `employability.ts` | `employability` |
@@ -170,7 +170,7 @@ Each file declares its PostgreSQL schema and all tables within it:
 ```typescript
 import { pgSchema } from 'drizzle-orm/pg-core';
 
-export const authSchema = pgSchema('auth');
+export const authSchema = pgSchema('app_auth');
 
 export const users = authSchema.table('users', {
   // columns...
@@ -235,7 +235,7 @@ uniqueIndex('uq_application_per_vacancy').on(t.vacancyId, t.candidateId),
 moduleId: uuid('module_id').notNull().references(() => modules.id, { onDelete: 'cascade' }),
 ```
 
-**Cross-schema FK** (e.g., core → auth):
+**Cross-schema FK** (e.g., core → app_auth):
 ```typescript
 import { users } from './auth.js';
 
@@ -435,7 +435,7 @@ type NewUser = InferInsertModel<typeof users>;        // what you INSERT
 
 ## Architecture Context
 
-- **Pattern**: Modular monolith (4 business schemas: auth, core, catalog, employability)
+- **Pattern**: Modular monolith (4 business schemas: app_auth, core, catalog, employability)
 - **Auth**: JWT + bcrypt, RBAC with roles/permissions
 - **Validation**: `@bopacorp/shared` for all Zod request/response schemas (no schemas in API modules)
 - **ORM**: Drizzle with `node-postgres` driver, multi-schema PostgreSQL

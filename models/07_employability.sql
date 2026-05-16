@@ -14,7 +14,7 @@ CREATE SCHEMA IF NOT EXISTS employability;
 -- ENTITY TABLES (4)
 -- =============================================
 
--- 1. CANDIDATES (external applicants — not linked to auth.users)
+-- 1. CANDIDATES (external applicants — not linked to app_auth.users)
 CREATE TABLE employability.candidates (
     id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     national_id VARCHAR(20)  NOT NULL UNIQUE,
@@ -33,7 +33,7 @@ CREATE INDEX idx_candidates_national_id ON employability.candidates(national_id)
 -- 2. JOB_VACANCIES (public job postings)
 CREATE TABLE employability.job_vacancies (
     id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_by       UUID         NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    created_by       UUID         NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
     title            VARCHAR(255) NOT NULL,
     description      TEXT         NOT NULL,
     requirements     TEXT         NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE employability.job_applications (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     vacancy_id   UUID        NOT NULL REFERENCES employability.job_vacancies(id) ON DELETE CASCADE,
     candidate_id UUID        NOT NULL REFERENCES employability.candidates(id) ON DELETE CASCADE,
-    reviewed_by  UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+    reviewed_by  UUID        REFERENCES app_auth.users(id) ON DELETE SET NULL,
     state        VARCHAR(20) NOT NULL DEFAULT 'DRAFT'
                              CHECK (state IN ('DRAFT', 'PENDING', 'ACCEPTED', 'REJECTED')),
     cover_letter TEXT,

@@ -18,8 +18,8 @@ CREATE SCHEMA IF NOT EXISTS matrices;
 CREATE TABLE matrices.offer_matrices (
     id                 UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
     negotiation_id     UUID          NOT NULL REFERENCES crm.negotiations(id) ON DELETE CASCADE,
-    creator_id         UUID          NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-    approved_by        UUID          REFERENCES auth.users(id) ON DELETE SET NULL,
+    creator_id         UUID          NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
+    approved_by        UUID          REFERENCES app_auth.users(id) ON DELETE SET NULL,
     state              VARCHAR(20)   NOT NULL DEFAULT 'DRAFT'
                                      CHECK (state IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED')),
     observations       TEXT,
@@ -60,7 +60,7 @@ CREATE INDEX idx_matrix_line_items_item   ON matrices.matrix_line_items(item_id)
 CREATE TABLE matrices.matrix_attachments (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     matrix_id      UUID         NOT NULL REFERENCES matrices.offer_matrices(id) ON DELETE CASCADE,
-    uploaded_by    UUID         NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    uploaded_by    UUID         NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
     description    VARCHAR(255),
     filename       VARCHAR(255) NOT NULL,
     file_extension VARCHAR(10)  NOT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE matrices.matrix_state_history (
     matrix_id      UUID        NOT NULL REFERENCES matrices.offer_matrices(id) ON DELETE CASCADE,
     previous_state VARCHAR(20) CHECK (previous_state IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED')),
     new_state      VARCHAR(20) NOT NULL CHECK (new_state IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED')),
-    changed_by     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    changed_by     UUID        NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
     notes          TEXT,
     created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

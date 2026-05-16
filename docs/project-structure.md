@@ -96,7 +96,7 @@ API modules map to **business concerns**, not database schemas. One DB schema ca
 
 | DB Schema | Tables | API Modules |
 |-----------|--------|-------------|
-| `auth` | 9 tables | `auth` (login/tokens), `users` (CRUD), `roles` (RBAC admin) |
+| `app_auth` | 9 tables | `auth` (login/tokens), `users` (CRUD), `roles` (RBAC admin) |
 | `core` | 2 tables | `profiles` (profiles, advisor assignments) |
 | `catalog` | 20 tables | `catalog` (items, categories, CMS) |
 | `employability` | 4 tables | `employability` (vacancies, candidates, applications) |
@@ -148,7 +148,7 @@ Express middleware used across modules:
 | File | Purpose |
 |------|---------|
 | `authenticate.ts` | JWT verification → sets `req.user` |
-| `authorize.ts` | Permission/role check (uses RBAC from auth schema) |
+| `authorize.ts` | Permission/role check (uses RBAC from app_auth schema) |
 | `validate.ts` | Generic Zod validation middleware (works with any schema) |
 | `error-handler.ts` | Global error handler (catches HttpError, formats response) |
 

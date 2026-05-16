@@ -21,8 +21,8 @@ CREATE SCHEMA IF NOT EXISTS reports;
 -- 1. SALES_OBJECTIVES (period-based sales targets set by managers)
 CREATE TABLE reports.sales_objectives (
     id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_by          UUID          NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-    advisor_id          UUID          REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_by          UUID          NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
+    advisor_id          UUID          REFERENCES app_auth.users(id) ON DELETE SET NULL,
     target_sales_amount DECIMAL(15,2) NOT NULL CHECK (target_sales_amount >= 0),
     target_closed_deals INTEGER       NOT NULL CHECK (target_closed_deals >= 0),
     period_start        DATE          NOT NULL,
@@ -40,7 +40,7 @@ CREATE INDEX idx_sales_objectives_period     ON reports.sales_objectives(period_
 -- 2. REPORT_EXPORTS (file metadata for generated PDF/Excel reports)
 CREATE TABLE reports.report_exports (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    generated_by   UUID         NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    generated_by   UUID         NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
     report_type    VARCHAR(30)  NOT NULL
                                 CHECK (report_type IN ('COMMERCIAL_PERFORMANCE', 'OPERATIONAL', 'ADVISOR_DASHBOARD')),
     title          VARCHAR(255) NOT NULL,
@@ -70,7 +70,7 @@ CREATE SCHEMA IF NOT EXISTS notifications;
 -- 3. NOTIFICATIONS (in-app notification records with read tracking)
 CREATE TABLE notifications.notifications (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    recipient_id   UUID         NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    recipient_id   UUID         NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
     title          VARCHAR(200) NOT NULL,
     message        TEXT         NOT NULL,
     reference_type VARCHAR(50),

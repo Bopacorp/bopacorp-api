@@ -35,8 +35,8 @@ CREATE TABLE documents.negotiation_documents (
     id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     negotiation_id      UUID         NOT NULL REFERENCES crm.negotiations(id) ON DELETE CASCADE,
     document_type_id    UUID         NOT NULL REFERENCES documents.document_types(id) ON DELETE RESTRICT,
-    uploaded_by         UUID         NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-    reviewed_by         UUID         REFERENCES auth.users(id) ON DELETE SET NULL,
+    uploaded_by         UUID         NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
+    reviewed_by         UUID         REFERENCES app_auth.users(id) ON DELETE SET NULL,
     state               VARCHAR(20)  NOT NULL DEFAULT 'PENDING_APPROVAL'
                                      CHECK (state IN ('PENDING_APPROVAL', 'ACCEPTED', 'REJECTED')),
     filename            VARCHAR(255) NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE documents.document_state_history (
     document_id    UUID        NOT NULL REFERENCES documents.negotiation_documents(id) ON DELETE CASCADE,
     previous_state VARCHAR(20) CHECK (previous_state IN ('PENDING_APPROVAL', 'ACCEPTED', 'REJECTED')),
     new_state      VARCHAR(20) NOT NULL CHECK (new_state IN ('PENDING_APPROVAL', 'ACCEPTED', 'REJECTED')),
-    changed_by     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    changed_by     UUID        NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
     notes          TEXT,
     created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

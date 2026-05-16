@@ -260,7 +260,7 @@ CREATE TABLE catalog.content_blocks (
     title           VARCHAR(200),
     body            TEXT,
     sort_order      INTEGER      NOT NULL DEFAULT 0,
-    updated_by      UUID         REFERENCES auth.users(id) ON DELETE SET NULL,
+    updated_by      UUID         REFERENCES app_auth.users(id) ON DELETE SET NULL,
     created_at      TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
     deleted_at      TIMESTAMPTZ
@@ -280,7 +280,7 @@ CREATE TABLE catalog.contact_requests (
     message      TEXT,
     is_attended  BOOLEAN      NOT NULL DEFAULT FALSE,
     attended_at  TIMESTAMPTZ,
-    attended_by  UUID         REFERENCES auth.users(id) ON DELETE SET NULL,
+    attended_by  UUID         REFERENCES app_auth.users(id) ON DELETE SET NULL,
     created_at   TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
 );
 
