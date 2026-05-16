@@ -10,8 +10,8 @@ node_modules/
 dist/
 build/
 
-# Prisma generated client
-generated/
+# Drizzle
+drizzle/meta/
 
 # Logs
 logs/

@@ -1,18 +1,35 @@
 import { env } from '@config/env.js';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../../generated/prisma/client.js';
+import { logger } from '@lib/logger.js';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
+import * as schema from '../db/schema/index.js';
 
-const globalForDb = global as unknown as { db: PrismaClient };
+let pool: pg.Pool | null = null;
+let drizzleInstance: NodePgDatabase<typeof schema> | null = null;
 
-const adapter = new PrismaPg({
-  connectionString: env.DATABASE_URL,
-});
-
-export const db =
-  globalForDb.db ||
-  new PrismaClient({
-    adapter,
-    log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+function createPool(): pg.Pool {
+  const newPool = new pg.Pool({
+    connectionString: env.DATABASE_URL,
+    max: env.NODE_ENV === 'production' ? 20 : 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
   });
 
-if (env.NODE_ENV !== 'production') globalForDb.db = db;
+  newPool.on('error', (err) => {
+    logger.error(err, 'Unexpected pool error, discarding pool');
+    pool = null;
+    drizzleInstance = null;
+  });
+
+  return newPool;
+}
+
+export function getDb(): NodePgDatabase<typeof schema> {
+  if (!drizzleInstance) {
+    pool = createPool();
+    drizzleInstance = drizzle({ client: pool, schema });
+  }
+  return drizzleInstance;
+}
+
+export const db = getDb();

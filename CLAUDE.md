@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 RESTful API for BOPACORP S.A. — B2B telecom sales platform (Movistar Ecuador partner). Powers two clients: web CRM/CMS for supervisors and mobile field app for sales advisors.
 
-Stack: Express 5 + TypeScript 6 + Prisma 7 + PostgreSQL (Supabase) + Zod 4 + JWT auth + Pino logging. Node.js 22+. ESM only.
+Stack: Express 5 + TypeScript 6 + Drizzle ORM + PostgreSQL (Supabase) + Zod 4 + JWT auth + Pino logging. Node.js 22+. ESM only.
 
 ## Commands
 
@@ -21,10 +21,10 @@ Stack: Express 5 + TypeScript 6 + Prisma 7 + PostgreSQL (Supabase) + Zod 4 + JWT
 | Run tests | `npm test` |
 | Single test file | `npx vitest run src/path/to/file.test.ts` |
 | Tests with coverage | `npx vitest --coverage` |
-| Generate Prisma client | `npx prisma generate` |
-| Create migration | `npx prisma migrate dev` |
-| Seed database | `npx prisma db seed` |
-| Prisma GUI | `npx prisma studio` |
+| Generate migration | `npm run db:generate` |
+| Apply migrations | `npm run db:migrate` |
+| Push schema (no migration) | `npm run db:push` |
+| DB GUI | `npm run db:studio` |
 
 ## Architecture
 
@@ -38,7 +38,7 @@ Stack: Express 5 + TypeScript 6 + Prisma 7 + PostgreSQL (Supabase) + Zod 4 + JWT
 
 **Shared code** in `src/shared/` (middleware, utils, types). Library singletons in `src/lib/` (db client, logger).
 
-**Database**: Prisma 7 with `@prisma/adapter-pg` driver adapter. Schema at `prisma/schema.prisma`, client generated to `generated/prisma/`. Config in root `prisma.config.ts`. Two connection strings: `DATABASE_URL` (pooled, app queries) and `DIRECT_URL` (direct, migrations).
+**Database**: Drizzle ORM with `node-postgres` driver. Schema defined in TypeScript at `src/db/schema/`. Config at `drizzle.config.ts`. Migrations output to `drizzle/`. Two connection strings: `DATABASE_URL` (pooled via pgbouncer, app queries) and `DIRECT_URL` (direct, migrations). Multi-schema PostgreSQL via `pgSchema()`.
 
 ## Critical Rules
 
@@ -49,13 +49,13 @@ import { db } from '@lib/db';        // breaks at runtime
 ```
 
 ### Path aliases over relative imports
-`@config/*`, `@lib/*`, `@modules/*`, `@shared/*` — defined in `tsconfig.json`, resolved by `tsx` (dev), `tsc-alias` (build), `vitest.config.ts` (test). Exception: files loaded by external tools (e.g., `prisma.config.ts`) must use relative imports.
+`@config/*`, `@lib/*`, `@modules/*`, `@shared/*` — defined in `tsconfig.json`, resolved by `tsx` (dev), `tsc-alias` (build), `vitest.config.ts` (test). Exception: `drizzle.config.ts` at root uses relative imports (loaded by drizzle-kit directly).
 
-### Prisma client import path
+### Database client
 ```typescript
-import { PrismaClient } from '../../generated/prisma/client.js';
+import { db } from '@lib/db.js';
 ```
-Run `npx prisma generate` after any schema change.
+Schema defined in `src/db/schema/*.ts` — types inferred directly, no generate step.
 
 ### Strict TypeScript
 `noUncheckedIndexedAccess` (array access returns `T | undefined`), `exactOptionalPropertyTypes`, `verbatimModuleSyntax` (must use `import type` for type-only imports), `noUnusedLocals`, `noUnusedParameters`.
