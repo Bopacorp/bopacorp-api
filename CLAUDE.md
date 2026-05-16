@@ -38,7 +38,18 @@ Stack: Express 5 + TypeScript 6 + Drizzle ORM + PostgreSQL (Supabase) + Zod 4 + 
 
 **Shared code** in `src/shared/` (middleware, utils, types). Library singletons in `src/lib/` (db client, logger).
 
-**Database**: Drizzle ORM with `node-postgres` driver. Schema defined in TypeScript at `src/db/schema/`. Config at `drizzle.config.ts`. Migrations output to `drizzle/`. Two connection strings: `DATABASE_URL` (pooled via pgbouncer, app queries) and `DIRECT_URL` (direct, migrations). Multi-schema PostgreSQL via `pgSchema()`.
+**Database**: Drizzle ORM with `node-postgres` driver. Schema defined in TypeScript at `src/db/schema/`. Config at `drizzle.config.ts`. Migrations output to `drizzle/`. Two connection strings: `DATABASE_URL` (pooled, app queries) and `DIRECT_URL` (direct, migrations). Multi-schema PostgreSQL via `pgSchema()`.
+
+**DB schemas** — 4 PostgreSQL schemas, one Drizzle file each:
+
+| Schema | File | Tables | Source SQL |
+|--------|------|--------|-----------|
+| `auth` | `auth.ts` | 9 tables, 4 enums | `models/01_auth_rbac.sql` |
+| `core` | `core.ts` | 2 tables | `models/02_profiles.sql` |
+| `catalog` | `catalog.ts` | 20 tables | `models/04_catalog.sql` |
+| `employability` | `employability.ts` | 4 tables, 1 enum | `models/07_employability.sql` |
+
+Relations live in `relations.ts` (one file for all schemas — avoids circular imports).
 
 ## Critical Rules
 
