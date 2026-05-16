@@ -435,13 +435,19 @@ type NewUser = InferInsertModel<typeof users>;        // what you INSERT
 
 ## Architecture Context
 
-- **Pattern**: Modular monolith (4 business schemas: auth, core, catalog, employability)
+- **Pattern**: Modular monolith (4 business schemas: app_auth, core, catalog, employability)
 - **Auth**: JWT + bcrypt, RBAC with roles/permissions
 - **Validation**: `@bopacorp/shared` for all Zod request/response schemas (no schemas in API modules)
+- **API responses**: `{ success, data, meta? }` envelope via `@bopacorp/shared/common`
+- **Error handling**: typed `HttpError` classes in services → global error handler formats response
 - **ORM**: Drizzle with `node-postgres` driver, multi-schema PostgreSQL
 - **Logging**: Pino (JSON in prod, pretty in dev)
 - **Formatting**: Biome (2-space indent, single quotes, semicolons, 100 char width)
-- **Full module rules**: `docs/project-structure.md`
+
+**Guides**:
+- Module structure: `docs/project-structure.md`
+- API design, errors, validation: `docs/api-conventions.md`
+- Drizzle ORM rules: `docs/drizzle-guide.md`
 
 ## Coding Standards
 
