@@ -32,3 +32,4 @@ coverage/
 
 # Agents
 .opencode
+.claude

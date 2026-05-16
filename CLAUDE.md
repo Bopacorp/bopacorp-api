@@ -41,6 +41,8 @@ No `*.schema.ts` in modules — all Zod validation schemas live in `@bopacorp/sh
 
 **Dependency flow** (one-way): `routes → controller → service → db`. Never reverse. Never cross-import between modules.
 
+**API conventions**: `{ success, data }` envelope, typed `HttpError` classes, Zod validation in middleware. Full rules in `docs/api-conventions.md`.
+
 **Shared code** in `src/shared/` (middleware, errors, utils, types). Library singletons in `src/lib/` (db client, logger). Full module rules in `docs/project-structure.md`.
 
 **Database**: Drizzle ORM with `node-postgres` driver. Schema defined in TypeScript at `src/db/schema/`. Config at `drizzle.config.ts`. Migrations output to `drizzle/`. Two connection strings: `DATABASE_URL` (pooled, app queries) and `DIRECT_URL` (direct, migrations). Multi-schema PostgreSQL via `pgSchema()`.
