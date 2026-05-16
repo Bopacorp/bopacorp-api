@@ -1,4 +1,4 @@
-CREATE SCHEMA "auth";
+CREATE SCHEMA "app_auth";
 --> statement-breakpoint
 CREATE SCHEMA "catalog";
 --> statement-breakpoint
@@ -11,7 +11,7 @@ CREATE TYPE "public"."login_status" AS ENUM('success', 'failed', 'locked');--> s
 CREATE TYPE "public"."permission_type" AS ENUM('crud', 'action', 'report', 'view', 'approval');--> statement-breakpoint
 CREATE TYPE "public"."token_type" AS ENUM('refresh', 'password_reset', 'email_verify');--> statement-breakpoint
 CREATE TYPE "public"."application_state" AS ENUM('DRAFT', 'PENDING', 'ACCEPTED', 'REJECTED');--> statement-breakpoint
-CREATE TABLE "auth"."audit_logs" (
+CREATE TABLE "app_auth"."audit_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"table_name" varchar(100) NOT NULL,
 	"record_id" uuid NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE "auth"."audit_logs" (
 	"created_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."auth_tokens" (
+CREATE TABLE "app_auth"."auth_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"token" varchar(500) NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE "auth"."auth_tokens" (
 	CONSTRAINT "auth_tokens_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."login_logs" (
+CREATE TABLE "app_auth"."login_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"ip_address" varchar(45),
@@ -44,7 +44,7 @@ CREATE TABLE "auth"."login_logs" (
 	"created_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."modules" (
+CREATE TABLE "app_auth"."modules" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"parent_id" uuid,
 	"name" varchar(100) NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE "auth"."modules" (
 	CONSTRAINT "modules_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."permissions" (
+CREATE TABLE "app_auth"."permissions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"module_id" uuid NOT NULL,
 	"code" varchar(150) NOT NULL,
@@ -70,14 +70,14 @@ CREATE TABLE "auth"."permissions" (
 	CONSTRAINT "permissions_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."role_permissions" (
+CREATE TABLE "app_auth"."role_permissions" (
 	"role_id" uuid NOT NULL,
 	"permission_id" uuid NOT NULL,
 	"is_granted" boolean DEFAULT true NOT NULL,
 	CONSTRAINT "role_permissions_role_id_permission_id_pk" PRIMARY KEY("role_id","permission_id")
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."roles" (
+CREATE TABLE "app_auth"."roles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(100) NOT NULL,
 	"slug" varchar(100) NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE "auth"."roles" (
 	CONSTRAINT "roles_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."user_roles" (
+CREATE TABLE "app_auth"."user_roles" (
 	"user_id" uuid NOT NULL,
 	"role_id" uuid NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
@@ -97,7 +97,7 @@ CREATE TABLE "auth"."user_roles" (
 	CONSTRAINT "user_roles_user_id_role_id_pk" PRIMARY KEY("user_id","role_id")
 );
 --> statement-breakpoint
-CREATE TABLE "auth"."users" (
+CREATE TABLE "app_auth"."users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"username" varchar(50) NOT NULL,
 	"email" varchar(150) NOT NULL,
@@ -430,15 +430,15 @@ CREATE TABLE "employability"."job_vacancies" (
 	CONSTRAINT "chk_vacancy_dates" CHECK (closing_date IS NULL OR publication_date IS NULL OR closing_date >= publication_date)
 );
 --> statement-breakpoint
-ALTER TABLE "auth"."audit_logs" ADD CONSTRAINT "audit_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."auth_tokens" ADD CONSTRAINT "auth_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."login_logs" ADD CONSTRAINT "login_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."modules" ADD CONSTRAINT "modules_parent_id_modules_id_fk" FOREIGN KEY ("parent_id") REFERENCES "auth"."modules"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."permissions" ADD CONSTRAINT "permissions_module_id_modules_id_fk" FOREIGN KEY ("module_id") REFERENCES "auth"."modules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "auth"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."role_permissions" ADD CONSTRAINT "role_permissions_permission_id_permissions_id_fk" FOREIGN KEY ("permission_id") REFERENCES "auth"."permissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."user_roles" ADD CONSTRAINT "user_roles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "auth"."user_roles" ADD CONSTRAINT "user_roles_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "auth"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."audit_logs" ADD CONSTRAINT "audit_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."auth_tokens" ADD CONSTRAINT "auth_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."login_logs" ADD CONSTRAINT "login_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."modules" ADD CONSTRAINT "modules_parent_id_modules_id_fk" FOREIGN KEY ("parent_id") REFERENCES "app_auth"."modules"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."permissions" ADD CONSTRAINT "permissions_module_id_modules_id_fk" FOREIGN KEY ("module_id") REFERENCES "app_auth"."modules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "app_auth"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."role_permissions" ADD CONSTRAINT "role_permissions_permission_id_permissions_id_fk" FOREIGN KEY ("permission_id") REFERENCES "app_auth"."permissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."user_roles" ADD CONSTRAINT "user_roles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_auth"."user_roles" ADD CONSTRAINT "user_roles_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "app_auth"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."age_conditions" ADD CONSTRAINT "age_conditions_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."catalog_items" ADD CONSTRAINT "catalog_items_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "catalog"."categories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."catalog_items" ADD CONSTRAINT "catalog_items_item_type_id_item_types_id_fk" FOREIGN KEY ("item_type_id") REFERENCES "catalog"."item_types"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -448,9 +448,9 @@ ALTER TABLE "catalog"."catalog_items" ADD CONSTRAINT "catalog_items_tier_id_tier
 ALTER TABLE "catalog"."categories" ADD CONSTRAINT "categories_parent_id_categories_id_fk" FOREIGN KEY ("parent_id") REFERENCES "catalog"."categories"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."connectivity_details" ADD CONSTRAINT "connectivity_details_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."contact_requests" ADD CONSTRAINT "contact_requests_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "catalog"."contact_requests" ADD CONSTRAINT "contact_requests_attended_by_users_id_fk" FOREIGN KEY ("attended_by") REFERENCES "auth"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "catalog"."contact_requests" ADD CONSTRAINT "contact_requests_attended_by_users_id_fk" FOREIGN KEY ("attended_by") REFERENCES "app_auth"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."content_blocks" ADD CONSTRAINT "content_blocks_content_type_id_content_types_id_fk" FOREIGN KEY ("content_type_id") REFERENCES "catalog"."content_types"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "catalog"."content_blocks" ADD CONSTRAINT "content_blocks_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "auth"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "catalog"."content_blocks" ADD CONSTRAINT "content_blocks_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "app_auth"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."device_details" ADD CONSTRAINT "device_details_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."digital_details" ADD CONSTRAINT "digital_details_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."item_benefits" ADD CONSTRAINT "item_benefits_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -460,30 +460,30 @@ ALTER TABLE "catalog"."roaming_details" ADD CONSTRAINT "roaming_details_item_id_
 ALTER TABLE "catalog"."roaming_details" ADD CONSTRAINT "roaming_details_geo_zone_id_geo_zones_id_fk" FOREIGN KEY ("geo_zone_id") REFERENCES "catalog"."geo_zones"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."temporal_conditions" ADD CONSTRAINT "temporal_conditions_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog"."voice_details" ADD CONSTRAINT "voice_details_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "catalog"."catalog_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "core"."advisor_supervisors" ADD CONSTRAINT "advisor_supervisors_advisor_id_users_id_fk" FOREIGN KEY ("advisor_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "core"."advisor_supervisors" ADD CONSTRAINT "advisor_supervisors_supervisor_id_users_id_fk" FOREIGN KEY ("supervisor_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "core"."profiles" ADD CONSTRAINT "profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "core"."advisor_supervisors" ADD CONSTRAINT "advisor_supervisors_advisor_id_users_id_fk" FOREIGN KEY ("advisor_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "core"."advisor_supervisors" ADD CONSTRAINT "advisor_supervisors_supervisor_id_users_id_fk" FOREIGN KEY ("supervisor_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "core"."profiles" ADD CONSTRAINT "profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "employability"."candidate_resumes" ADD CONSTRAINT "candidate_resumes_candidate_id_candidates_id_fk" FOREIGN KEY ("candidate_id") REFERENCES "employability"."candidates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "employability"."candidate_resumes" ADD CONSTRAINT "candidate_resumes_application_id_job_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "employability"."job_applications"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "employability"."job_applications" ADD CONSTRAINT "job_applications_vacancy_id_job_vacancies_id_fk" FOREIGN KEY ("vacancy_id") REFERENCES "employability"."job_vacancies"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "employability"."job_applications" ADD CONSTRAINT "job_applications_candidate_id_candidates_id_fk" FOREIGN KEY ("candidate_id") REFERENCES "employability"."candidates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "employability"."job_applications" ADD CONSTRAINT "job_applications_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "auth"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "employability"."job_vacancies" ADD CONSTRAINT "job_vacancies_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_audit_logs_table" ON "auth"."audit_logs" USING btree ("table_name");--> statement-breakpoint
-CREATE INDEX "idx_audit_logs_record" ON "auth"."audit_logs" USING btree ("record_id");--> statement-breakpoint
-CREATE INDEX "idx_audit_logs_user" ON "auth"."audit_logs" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_audit_logs_created" ON "auth"."audit_logs" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX "idx_auth_tokens_user_type" ON "auth"."auth_tokens" USING btree ("user_id","type");--> statement-breakpoint
-CREATE INDEX "idx_auth_tokens_expires" ON "auth"."auth_tokens" USING btree ("expires_at");--> statement-breakpoint
-CREATE INDEX "idx_login_logs_user" ON "auth"."login_logs" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_login_logs_created" ON "auth"."login_logs" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX "idx_permissions_module" ON "auth"."permissions" USING btree ("module_id");--> statement-breakpoint
-CREATE INDEX "idx_permissions_type" ON "auth"."permissions" USING btree ("type");--> statement-breakpoint
-CREATE INDEX "idx_role_permissions_permission" ON "auth"."role_permissions" USING btree ("permission_id");--> statement-breakpoint
-CREATE INDEX "idx_user_roles_role" ON "auth"."user_roles" USING btree ("role_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_users_email" ON "auth"."users" USING btree ("email") WHERE deleted_at IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_users_username" ON "auth"."users" USING btree ("username") WHERE deleted_at IS NULL;--> statement-breakpoint
-CREATE INDEX "idx_users_active" ON "auth"."users" USING btree ("is_active") WHERE deleted_at IS NULL;--> statement-breakpoint
+ALTER TABLE "employability"."job_applications" ADD CONSTRAINT "job_applications_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "app_auth"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "employability"."job_vacancies" ADD CONSTRAINT "job_vacancies_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "app_auth"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_table" ON "app_auth"."audit_logs" USING btree ("table_name");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_record" ON "app_auth"."audit_logs" USING btree ("record_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_user" ON "app_auth"."audit_logs" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_created" ON "app_auth"."audit_logs" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "idx_auth_tokens_user_type" ON "app_auth"."auth_tokens" USING btree ("user_id","type");--> statement-breakpoint
+CREATE INDEX "idx_auth_tokens_expires" ON "app_auth"."auth_tokens" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "idx_login_logs_user" ON "app_auth"."login_logs" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_login_logs_created" ON "app_auth"."login_logs" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "idx_permissions_module" ON "app_auth"."permissions" USING btree ("module_id");--> statement-breakpoint
+CREATE INDEX "idx_permissions_type" ON "app_auth"."permissions" USING btree ("type");--> statement-breakpoint
+CREATE INDEX "idx_role_permissions_permission" ON "app_auth"."role_permissions" USING btree ("permission_id");--> statement-breakpoint
+CREATE INDEX "idx_user_roles_role" ON "app_auth"."user_roles" USING btree ("role_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_users_email" ON "app_auth"."users" USING btree ("email") WHERE deleted_at IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_users_username" ON "app_auth"."users" USING btree ("username") WHERE deleted_at IS NULL;--> statement-breakpoint
+CREATE INDEX "idx_users_active" ON "app_auth"."users" USING btree ("is_active") WHERE deleted_at IS NULL;--> statement-breakpoint
 CREATE INDEX "idx_age_conditions_item" ON "catalog"."age_conditions" USING btree ("item_id");--> statement-breakpoint
 CREATE INDEX "idx_catalog_items_category" ON "catalog"."catalog_items" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "idx_catalog_items_item_type" ON "catalog"."catalog_items" USING btree ("item_type_id") WHERE deleted_at IS NULL;--> statement-breakpoint

@@ -9,7 +9,7 @@ export default defineConfig({
   dbCredentials: {
     url: env.DIRECT_URL || env.DATABASE_URL,
   },
-  schemaFilter: ['auth', 'core', 'catalog', 'employability'],
+  schemaFilter: ['app_auth', 'core', 'catalog', 'employability'],
   verbose: true,
   strict: true,
 });

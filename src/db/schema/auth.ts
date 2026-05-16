@@ -15,7 +15,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const authSchema = pgSchema('auth');
+export const authSchema = pgSchema('app_auth');
 
 export const permissionTypeEnum = pgEnum('permission_type', [
   'crud',
