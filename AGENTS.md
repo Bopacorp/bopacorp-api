@@ -96,17 +96,47 @@ src/
 ├── lib/
 │   ├── db.ts                  # Database client singleton
 │   └── logger.ts              # Pino logger
-├── modules/[name]/            # Domain modules
-│   ├── [name].routes.ts
-│   ├── [name].controller.ts
-│   ├── [name].service.ts
-│   └── [name].schema.ts       # Zod validation
+├── modules/                   # Business domain modules (3 files each)
+│   ├── auth/                  # Login, logout, tokens, password reset
+│   │   ├── auth.routes.ts
+│   │   ├── auth.controller.ts
+│   │   └── auth.service.ts
+│   ├── users/                 # CRUD users, assign/remove roles
+│   │   └── ...
+│   ├── roles/                 # CRUD roles, permissions, modules (RBAC admin)
+│   │   └── ...
+│   ├── profiles/              # Profiles, advisor-supervisor assignments
+│   │   └── ...
+│   ├── catalog/               # Service catalog, categories, CMS
+│   │   └── ...
+│   └── employability/         # Job vacancies, candidates, applications
+│       └── ...
 ├── shared/
-│   ├── middleware/
-│   ├── utils/
-│   └── types/
-└── index.ts                   # Entry point
+│   ├── middleware/             # authenticate, authorize, validate, error-handler
+│   ├── errors/                # HttpError class hierarchy
+│   ├── utils/                 # Pure utility functions
+│   └── types/                 # Global TS declarations (express.d.ts)
+├── server.ts                  # Express app + middleware + route mounting
+└── index.ts                   # Entry point (dotenv + env + boot)
 ```
+
+### Module Pattern
+
+Each module has **exactly 3 files**: `routes.ts`, `controller.ts`, `service.ts`.
+
+**No `*.schema.ts` in modules** — validation schemas live in `@bopacorp/shared`.
+
+**Dependency flow** (one-way only):
+```
+routes → controller → service → db
+   ↓          ↓
+validate   @bopacorp/shared
+middleware
+```
+
+**Never**: service imports controller, routes import db, module A imports module B's service.
+
+Full rules: `docs/project-structure.md`
 
 ### 5. Environment
 
@@ -407,10 +437,11 @@ type NewUser = InferInsertModel<typeof users>;        // what you INSERT
 
 - **Pattern**: Modular monolith (4 business schemas: auth, core, catalog, employability)
 - **Auth**: JWT + bcrypt, RBAC with roles/permissions
-- **Validation**: Zod schemas per module + `@bopacorp/shared` for API contracts
+- **Validation**: `@bopacorp/shared` for all Zod request/response schemas (no schemas in API modules)
 - **ORM**: Drizzle with `node-postgres` driver, multi-schema PostgreSQL
 - **Logging**: Pino (JSON in prod, pretty in dev)
 - **Formatting**: Biome (2-space indent, single quotes, semicolons, 100 char width)
+- **Full module rules**: `docs/project-structure.md`
 
 ## Coding Standards
 

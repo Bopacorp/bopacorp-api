@@ -30,13 +30,18 @@ Stack: Express 5 + TypeScript 6 + Drizzle ORM + PostgreSQL (Supabase) + Zod 4 + 
 
 **Entry point**: `src/index.ts` → loads dotenv, validates env via Zod (`src/config/env.ts`), boots `src/server.ts`.
 
-**Module pattern** — each business domain lives in `src/modules/[name]/`:
-- `[name].routes.ts` — Express routes
-- `[name].controller.ts` — request handling
-- `[name].service.ts` — business logic
-- `[name].schema.ts` — Zod validation schemas
+**Module pattern** — each business domain lives in `src/modules/[name]/` with exactly 3 files:
+- `[name].routes.ts` — route definitions + middleware wiring
+- `[name].controller.ts` — request parsing + response formatting
+- `[name].service.ts` — business logic + DB queries
 
-**Shared code** in `src/shared/` (middleware, utils, types). Library singletons in `src/lib/` (db client, logger).
+No `*.schema.ts` in modules — all Zod validation schemas live in `@bopacorp/shared`.
+
+**Current modules**: `auth`, `users`, `roles`, `profiles`, `catalog`, `employability`.
+
+**Dependency flow** (one-way): `routes → controller → service → db`. Never reverse. Never cross-import between modules.
+
+**Shared code** in `src/shared/` (middleware, errors, utils, types). Library singletons in `src/lib/` (db client, logger). Full module rules in `docs/project-structure.md`.
 
 **Database**: Drizzle ORM with `node-postgres` driver. Schema defined in TypeScript at `src/db/schema/`. Config at `drizzle.config.ts`. Migrations output to `drizzle/`. Two connection strings: `DATABASE_URL` (pooled, app queries) and `DIRECT_URL` (direct, migrations). Multi-schema PostgreSQL via `pgSchema()`.
 
