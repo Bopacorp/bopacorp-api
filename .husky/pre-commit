@@ -1,2 +1,3 @@
 echo "Running Biome check on staged files..."
 npx lint-staged
+npx --no -- commitlint --edit $1
