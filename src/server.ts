@@ -1,5 +1,6 @@
 import { env } from '@config/env.js';
 import { logger } from '@lib/logger.js';
+import { errorHandler } from '@shared/middleware/error-handler.js';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -29,6 +30,8 @@ app.get('/health', (req, res) => {
     env: env.NODE_ENV,
   });
 });
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);

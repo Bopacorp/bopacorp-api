@@ -448,6 +448,7 @@ type NewUser = InferInsertModel<typeof users>;        // what you INSERT
 - Module structure: `docs/project-structure.md`
 - API design, errors, validation: `docs/api-conventions.md`
 - Drizzle ORM rules: `docs/drizzle-guide.md`
+- Git branching, commits, PRs: `docs/git-workflow.md`
 
 ## Coding Standards
 
