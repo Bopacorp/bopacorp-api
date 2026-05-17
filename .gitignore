@@ -33,3 +33,4 @@ coverage/
 # Agents
 .opencode
 .claude
+.opencode/memory/
