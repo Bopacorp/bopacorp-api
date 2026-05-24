@@ -35,7 +35,12 @@ export function validate(schemas: ValidationSchemas) {
     if (schemas.query) {
       const result = schemas.query.safeParse(req.query);
       if (result.success) {
-        req.query = result.data as Record<string, string>;
+        Object.defineProperty(req, 'query', {
+          value: result.data,
+          configurable: true,
+          enumerable: true,
+          writable: true,
+        });
       } else {
         details.push(...formatIssues(result.error.issues));
       }
