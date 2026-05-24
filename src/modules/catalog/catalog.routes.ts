@@ -1,7 +1,12 @@
 import {
+  CreateContentBlockRequestSchema,
   CreateContentTypeRequestSchema,
+  ListContentBlocksQuerySchema,
+  UpdateContentBlockRequestSchema,
   UpdateContentTypeRequestSchema,
 } from '@bopacorp/shared/catalog';
+import { authenticate } from '@shared/middleware/authenticate.js';
+import { authorize } from '@shared/middleware/authorize.js';
 import { validate } from '@shared/middleware/validate.js';
 import { IdParamSchema } from '@shared/schemas/params.js';
 import { Router } from 'express';
@@ -29,4 +34,44 @@ catalogRoutes.patch(
   '/content-types/:id/disable',
   validate({ params: IdParamSchema }),
   controller.disable
+);
+
+catalogRoutes.get(
+  '/content-blocks',
+  authenticate,
+  authorize('content_blocks.read'),
+  validate({ query: ListContentBlocksQuerySchema }),
+  controller.listContentBlocks
+);
+
+catalogRoutes.get(
+  '/content-blocks/:id',
+  authenticate,
+  authorize('content_blocks.read'),
+  validate({ params: IdParamSchema }),
+  controller.getContentBlockById
+);
+
+catalogRoutes.post(
+  '/content-blocks',
+  authenticate,
+  authorize('content_blocks.create'),
+  validate({ body: CreateContentBlockRequestSchema }),
+  controller.createContentBlock
+);
+
+catalogRoutes.patch(
+  '/content-blocks/:id',
+  authenticate,
+  authorize('content_blocks.update'),
+  validate({ params: IdParamSchema, body: UpdateContentBlockRequestSchema }),
+  controller.updateContentBlock
+);
+
+catalogRoutes.delete(
+  '/content-blocks/:id',
+  authenticate,
+  authorize('content_blocks.delete'),
+  validate({ params: IdParamSchema }),
+  controller.deleteContentBlock
 );

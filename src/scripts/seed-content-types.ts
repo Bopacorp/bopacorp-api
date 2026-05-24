@@ -31,27 +31,14 @@ const SEED_TYPES = [
 ];
 
 async function seed() {
-  console.log('Seeding content types...');
-
-  const result = await db
+  await db
     .insert(contentTypes)
     .values(SEED_TYPES)
-    .onConflictDoNothing({ target: contentTypes.code })
-    .returning();
-
-  console.log(`Inserted ${result.length} new content types.`);
-
-  const all = await db.select({ code: contentTypes.code }).from(contentTypes);
-  console.log(
-    `Total content types in DB: ${all.length}`,
-    all.map((t) => t.code)
-  );
+    .onConflictDoNothing({ target: contentTypes.code });
 
   await closeDb();
-  console.log('Done.');
 }
 
-seed().catch((err) => {
-  console.error(err);
+seed().catch((_err) => {
   process.exit(1);
 });

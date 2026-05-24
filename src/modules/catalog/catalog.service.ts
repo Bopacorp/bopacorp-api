@@ -1,8 +1,14 @@
-import type { CreateContentTypeRequest, UpdateContentTypeRequest } from '@bopacorp/shared/catalog';
+import type {
+  CreateContentBlockRequest,
+  CreateContentTypeRequest,
+  ListContentBlocksQuery,
+  UpdateContentBlockRequest,
+  UpdateContentTypeRequest,
+} from '@bopacorp/shared/catalog';
 import { db } from '@lib/db.js';
 import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
-import { eq } from 'drizzle-orm';
-import { contentTypes } from '../../db/schema/catalog.js';
+import { and, asc, desc, eq, ilike, isNull, or } from 'drizzle-orm';
+import { contentBlocks, contentTypes } from '../../db/schema/catalog.js';
 
 export async function listContentTypes() {
   return db.select().from(contentTypes).orderBy(contentTypes.code);
@@ -75,4 +81,165 @@ export async function disableContentType(id: string) {
     .update(contentTypes)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(contentTypes.id, id));
+}
+
+const CONTENT_BLOCK_RESPONSE_COLUMNS = {
+  id: contentBlocks.id,
+  contentKey: contentBlocks.contentKey,
+  contentTypeId: contentBlocks.contentTypeId,
+  title: contentBlocks.title,
+  body: contentBlocks.body,
+  sortOrder: contentBlocks.sortOrder,
+  createdAt: contentBlocks.createdAt,
+  updatedAt: contentBlocks.updatedAt,
+};
+
+function getSortColumn(sortBy: string | undefined) {
+  switch (sortBy) {
+    case 'contentKey':
+      return contentBlocks.contentKey;
+    case 'title':
+      return contentBlocks.title;
+    case 'sortOrder':
+      return contentBlocks.sortOrder;
+    case 'createdAt':
+      return contentBlocks.createdAt;
+    case 'updatedAt':
+      return contentBlocks.updatedAt;
+    default:
+      return contentBlocks.sortOrder;
+  }
+}
+
+export async function listContentBlocks(query: ListContentBlocksQuery) {
+  const conditions = [isNull(contentBlocks.deletedAt)];
+
+  if (query.contentTypeId) {
+    const cond = eq(contentBlocks.contentTypeId, query.contentTypeId);
+    if (cond) conditions.push(cond);
+  }
+
+  if (query.search) {
+    const cond = or(
+      ilike(contentBlocks.contentKey, `%${query.search}%`),
+      ilike(contentBlocks.title, `%${query.search}%`)
+    );
+    if (cond) conditions.push(cond);
+  }
+
+  const where = and(...conditions);
+
+  const totalItems = await db.$count(contentBlocks, where);
+  const totalPages = Math.ceil(totalItems / query.limit);
+
+  const sortColumn = getSortColumn(query.sortBy);
+  const orderFn = query.sortOrder === 'desc' ? desc : asc;
+
+  const rows = await db
+    .select(CONTENT_BLOCK_RESPONSE_COLUMNS)
+    .from(contentBlocks)
+    .where(where)
+    .orderBy(orderFn(sortColumn))
+    .limit(query.limit)
+    .offset((query.page - 1) * query.limit);
+
+  return {
+    data: rows,
+    meta: {
+      page: query.page,
+      limit: query.limit,
+      totalItems,
+      totalPages,
+    },
+  };
+}
+
+export async function getContentBlockById(id: string) {
+  const [block] = await db
+    .select(CONTENT_BLOCK_RESPONSE_COLUMNS)
+    .from(contentBlocks)
+    .where(and(eq(contentBlocks.id, id), isNull(contentBlocks.deletedAt)));
+
+  if (!block) {
+    throw new NotFoundError('Content block', id);
+  }
+
+  return block;
+}
+
+export async function createContentBlock(input: CreateContentBlockRequest, userId: string) {
+  const existing = await db
+    .select()
+    .from(contentBlocks)
+    .where(and(eq(contentBlocks.contentKey, input.contentKey), isNull(contentBlocks.deletedAt)));
+
+  if (existing.length > 0) {
+    throw new ConflictError(`Content block with key '${input.contentKey}' already exists`);
+  }
+
+  const [block] = await db
+    .insert(contentBlocks)
+    .values({ ...input, updatedBy: userId })
+    .returning(CONTENT_BLOCK_RESPONSE_COLUMNS);
+
+  if (!block) {
+    throw new Error('Failed to create content block');
+  }
+
+  return block;
+}
+
+export async function updateContentBlock(
+  id: string,
+  input: UpdateContentBlockRequest,
+  userId: string
+) {
+  await getContentBlockById(id);
+
+  if (input.contentKey) {
+    const existing = await db
+      .select()
+      .from(contentBlocks)
+      .where(and(eq(contentBlocks.contentKey, input.contentKey), isNull(contentBlocks.deletedAt)));
+
+    const existingBlock = existing[0];
+    if (existingBlock && existingBlock.id !== id) {
+      throw new ConflictError(`Content block with key '${input.contentKey}' already exists`);
+    }
+  }
+
+  const updateData = insertInputToUpdateData(input, userId);
+
+  const [updated] = await db
+    .update(contentBlocks)
+    .set(updateData)
+    .where(and(eq(contentBlocks.id, id), isNull(contentBlocks.deletedAt)))
+    .returning(CONTENT_BLOCK_RESPONSE_COLUMNS);
+
+  if (!updated) {
+    throw new NotFoundError('Content block', id);
+  }
+
+  return updated;
+}
+
+function insertInputToUpdateData(input: UpdateContentBlockRequest, userId: string) {
+  const updateData: Partial<typeof contentBlocks.$inferInsert> = {
+    updatedAt: new Date(),
+    updatedBy: userId,
+  };
+
+  if (input.contentKey !== undefined) updateData.contentKey = input.contentKey;
+  if (input.contentTypeId !== undefined) updateData.contentTypeId = input.contentTypeId;
+  if (input.title !== undefined) updateData.title = input.title;
+  if (input.body !== undefined) updateData.body = input.body;
+  if (input.sortOrder !== undefined) updateData.sortOrder = input.sortOrder;
+
+  return updateData;
+}
+
+export async function deleteContentBlock(id: string) {
+  await getContentBlockById(id);
+
+  await db.update(contentBlocks).set({ deletedAt: new Date() }).where(eq(contentBlocks.id, id));
 }
