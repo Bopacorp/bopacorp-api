@@ -33,3 +33,11 @@ export function getDb(): NodePgDatabase<typeof schema> {
 }
 
 export const db = getDb();
+
+export async function closeDb(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = null;
+    drizzleInstance = null;
+  }
+}

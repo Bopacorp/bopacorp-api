@@ -1,5 +1,6 @@
 import { env } from '@config/env.js';
 import { logger } from '@lib/logger.js';
+import { catalogRoutes } from '@modules/catalog/catalog.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
 import { errorHandler } from '@shared/middleware/error-handler.js';
 import cors from 'cors';
@@ -31,6 +32,8 @@ app.get('/health', (req, res) => {
     env: env.NODE_ENV,
   });
 });
+
+app.use('/api/v1/catalog', catalogRoutes);
 
 app.use((req, _res) => {
   throw new HttpError(404, `${req.method} ${req.path} not found`, 'ROUTE_NOT_FOUND');
