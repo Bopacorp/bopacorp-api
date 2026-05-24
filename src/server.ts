@@ -1,5 +1,6 @@
 import { env } from '@config/env.js';
 import { logger } from '@lib/logger.js';
+import { authRoutes } from '@modules/auth/auth.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
 import { errorHandler } from '@shared/middleware/error-handler.js';
 import cors from 'cors';
@@ -20,6 +21,8 @@ app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
   })
 );
 
@@ -31,6 +34,8 @@ app.get('/health', (req, res) => {
     env: env.NODE_ENV,
   });
 });
+
+app.use('/api/v1/auth', authRoutes);
 
 app.use((req, _res) => {
   throw new HttpError(404, `${req.method} ${req.path} not found`, 'ROUTE_NOT_FOUND');
