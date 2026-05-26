@@ -14,24 +14,36 @@ import * as controller from './catalog.controller.js';
 
 export const catalogRoutes = Router();
 
-catalogRoutes.get('/content-types', controller.list);
+catalogRoutes.get('/content-types', authenticate, authorize('content_types.read'), controller.list);
 
-catalogRoutes.get('/content-types/:id', validate({ params: IdParamSchema }), controller.getById);
+catalogRoutes.get(
+  '/content-types/:id',
+  authenticate,
+  authorize('content_types.read'),
+  validate({ params: IdParamSchema }),
+  controller.getById
+);
 
 catalogRoutes.post(
   '/content-types',
+  authenticate,
+  authorize('content_types.create'),
   validate({ body: CreateContentTypeRequestSchema }),
   controller.create
 );
 
 catalogRoutes.patch(
   '/content-types/:id',
+  authenticate,
+  authorize('content_types.update'),
   validate({ params: IdParamSchema, body: UpdateContentTypeRequestSchema }),
   controller.update
 );
 
 catalogRoutes.patch(
   '/content-types/:id/disable',
+  authenticate,
+  authorize('content_types.delete'),
   validate({ params: IdParamSchema }),
   controller.disable
 );
