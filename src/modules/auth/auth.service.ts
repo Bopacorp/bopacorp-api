@@ -6,12 +6,6 @@ import type {
   ResetPasswordRequest,
 } from '@bopacorp/shared/auth';
 import { env } from '@config/env.js';
-import { db } from '@lib/db.js';
-import { createModuleLogger } from '@lib/logger.js';
-import { HttpError, NotFoundError, UnauthorizedError } from '@shared/errors/http-error.js';
-import bcrypt from 'bcrypt';
-import { and, count, eq, gt, gte, inArray, isNull, lt } from 'drizzle-orm';
-import jwt, { type SignOptions } from 'jsonwebtoken';
 import {
   auditLogs,
   authTokens,
@@ -19,7 +13,13 @@ import {
   permissions,
   rolePermissions,
   users,
-} from '../../db/schema/auth.js';
+} from '@db/schema/auth.js';
+import { db } from '@lib/db.js';
+import { createModuleLogger } from '@lib/logger.js';
+import { HttpError, NotFoundError, UnauthorizedError } from '@shared/errors/http-error.js';
+import bcrypt from 'bcrypt';
+import { and, count, eq, gt, gte, inArray, isNull, lt } from 'drizzle-orm';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 
 const logger = createModuleLogger('auth-service');
 

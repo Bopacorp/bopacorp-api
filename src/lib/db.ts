@@ -1,8 +1,8 @@
 import { env } from '@config/env.js';
+import * as schema from '@db/schema/index.js';
 import { logger } from '@lib/logger.js';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import * as schema from '../db/schema/index.js';
 
 let pool: pg.Pool | null = null;
 let drizzleInstance: NodePgDatabase<typeof schema> | null = null;
