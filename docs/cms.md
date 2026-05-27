@@ -125,6 +125,38 @@ Authorization: Bearer <admin-token>
 }
 ```
 
+## Seed Script
+
+A seed script populates the landing page with example blocks for local development:
+
+```bash
+npx tsx src/scripts/seed-cms-landing.ts
+```
+
+Requires `content_types` to be seeded first (run `seed-content-types.ts` once).
+
+### What it seeds
+
+| contentKey | contentType | Description |
+|---|---|---|
+| `hero.title` | TEXT | Main heading |
+| `hero.subtitle` | TEXT | Supporting text |
+| `hero.cta` | TEXT | Button label |
+| `hero.background` | IMAGE | Hero background URL |
+| `features.title` | TEXT | Features section heading |
+| `features.subtitle` | TEXT | Features section description |
+| `features.item.1` | HTML | Feature card 1 |
+| `features.item.2` | HTML | Feature card 2 |
+| `features.item.3` | HTML | Feature card 3 |
+| `banner.promo` | BANNER | Promotional banner (rendered HTML) |
+| `video.intro` | VIDEO | Video embed (iframe HTML in body) |
+| `cta.title` | TEXT | CTA heading |
+| `cta.button` | TEXT | CTA button label |
+| `footer.text` | TEXT | Copyright text |
+| `footer.links` | HTML | Footer link list |
+
+Uses `onConflictDoNothing` so it is safe to run repeatedly.
+
 ### Rules
 
 - `contentKey` must be unique across all blocks (enforced by DB unique index where `deleted_at IS NULL`).
