@@ -6,6 +6,7 @@ import { catalogItemsRoutes } from '@modules/catalog-items/catalog-items.routes.
 import { cmsRoutes } from '@modules/cms/cms.routes.js';
 import { contactRequestsRoutes } from '@modules/contact-requests/contact-requests.routes.js';
 import { employabilityRoutes } from '@modules/employability/employability.routes.js';
+import { usersRoutes } from '@modules/users/users.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
 import { authenticate } from '@shared/middleware/authenticate.js';
 import { errorHandler } from '@shared/middleware/error-handler.js';
@@ -46,6 +47,7 @@ app.use('/api/v1/catalog-items', authenticate, catalogItemsRoutes);
 app.use('/api/v1/contact-requests', contactRequestsRoutes);
 app.use('/api/v1/employability', employabilityRoutes);
 app.use('/api/v1/cms', cmsRoutes);
+app.use('/api/v1/users', authenticate, usersRoutes);
 app.use('/api/v1/auth', authRoutes);
 
 app.use((req, _res) => {
