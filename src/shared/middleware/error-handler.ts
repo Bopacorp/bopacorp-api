@@ -20,12 +20,13 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
   }
 
   if (err instanceof HttpError) {
-    logger.warn({ path: req.path, code: err.code }, err.message);
+    const is5xx = err.statusCode >= 500;
+    logger[is5xx ? 'error' : 'warn']({ path: req.path, code: err.code }, err.message);
     res.status(err.statusCode).json({
       success: false,
       error: {
         code: err.code,
-        message: err.message,
+        message: is5xx ? 'Internal server error' : err.message,
       },
     });
     return;

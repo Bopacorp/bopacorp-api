@@ -5,6 +5,7 @@ import type {
   RefreshTokenRequest,
   ResetPasswordRequest,
 } from '@bopacorp/shared/auth';
+import { UnauthorizedError } from '@shared/errors/http-error.js';
 import type { Request, Response } from 'express';
 import { authService } from './auth.service.js';
 
@@ -51,7 +52,10 @@ export const authController = {
 
   async changePassword(req: Request, res: Response) {
     const data = req.body as ChangePasswordRequest;
-    const userId = req.user?.id ?? '';
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+    const userId = req.user.id;
     await authService.changePassword(userId, { ...data, ...getClientInfo(req) });
     res.json({ success: true, data: { message: 'Password changed successfully' } });
   },

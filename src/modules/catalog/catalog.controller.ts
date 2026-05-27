@@ -3,6 +3,7 @@ import type {
   ListContentBlocksQuery,
   UpdateContentBlockRequest,
 } from '@bopacorp/shared/catalog';
+import { UnauthorizedError } from '@shared/errors/http-error.js';
 import type { Request, Response } from 'express';
 import * as service from './catalog.service.js';
 
@@ -43,18 +44,21 @@ export async function getContentBlockById(req: Request<{ id: string }>, res: Res
 }
 
 export async function createContentBlock(req: Request, res: Response) {
-  const data = await service.createContentBlock(
-    req.body as CreateContentBlockRequest,
-    req.user?.id ?? ''
-  );
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
+  const data = await service.createContentBlock(req.body as CreateContentBlockRequest, req.user.id);
   res.status(201).json({ success: true, data });
 }
 
 export async function updateContentBlock(req: Request<{ id: string }>, res: Response) {
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
   const data = await service.updateContentBlock(
     req.params.id,
     req.body as UpdateContentBlockRequest,
-    req.user?.id ?? ''
+    req.user.id
   );
   res.json({ success: true, data });
 }

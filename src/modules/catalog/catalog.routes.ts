@@ -5,7 +5,6 @@ import {
   UpdateContentBlockRequestSchema,
   UpdateContentTypeRequestSchema,
 } from '@bopacorp/shared/catalog';
-import { authenticate } from '@shared/middleware/authenticate.js';
 import { authorize } from '@shared/middleware/authorize.js';
 import { validate } from '@shared/middleware/validate.js';
 import { IdParamSchema } from '@shared/schemas/params.js';
@@ -14,11 +13,10 @@ import * as controller from './catalog.controller.js';
 
 export const catalogRoutes = Router();
 
-catalogRoutes.get('/content-types', authenticate, authorize('content_types.read'), controller.list);
+catalogRoutes.get('/content-types', authorize('content_types.read'), controller.list);
 
 catalogRoutes.get(
   '/content-types/:id',
-  authenticate,
   authorize('content_types.read'),
   validate({ params: IdParamSchema }),
   controller.getById
@@ -26,7 +24,6 @@ catalogRoutes.get(
 
 catalogRoutes.post(
   '/content-types',
-  authenticate,
   authorize('content_types.create'),
   validate({ body: CreateContentTypeRequestSchema }),
   controller.create
@@ -34,7 +31,6 @@ catalogRoutes.post(
 
 catalogRoutes.patch(
   '/content-types/:id',
-  authenticate,
   authorize('content_types.update'),
   validate({ params: IdParamSchema, body: UpdateContentTypeRequestSchema }),
   controller.update
@@ -42,7 +38,6 @@ catalogRoutes.patch(
 
 catalogRoutes.patch(
   '/content-types/:id/disable',
-  authenticate,
   authorize('content_types.delete'),
   validate({ params: IdParamSchema }),
   controller.disable
@@ -50,7 +45,6 @@ catalogRoutes.patch(
 
 catalogRoutes.get(
   '/content-blocks',
-  authenticate,
   authorize('content_blocks.read'),
   validate({ query: ListContentBlocksQuerySchema }),
   controller.listContentBlocks
@@ -58,7 +52,6 @@ catalogRoutes.get(
 
 catalogRoutes.get(
   '/content-blocks/:id',
-  authenticate,
   authorize('content_blocks.read'),
   validate({ params: IdParamSchema }),
   controller.getContentBlockById
@@ -66,7 +59,6 @@ catalogRoutes.get(
 
 catalogRoutes.post(
   '/content-blocks',
-  authenticate,
   authorize('content_blocks.create'),
   validate({ body: CreateContentBlockRequestSchema }),
   controller.createContentBlock
@@ -74,7 +66,6 @@ catalogRoutes.post(
 
 catalogRoutes.patch(
   '/content-blocks/:id',
-  authenticate,
   authorize('content_blocks.update'),
   validate({ params: IdParamSchema, body: UpdateContentBlockRequestSchema }),
   controller.updateContentBlock
@@ -82,7 +73,6 @@ catalogRoutes.patch(
 
 catalogRoutes.delete(
   '/content-blocks/:id',
-  authenticate,
   authorize('content_blocks.delete'),
   validate({ params: IdParamSchema }),
   controller.deleteContentBlock

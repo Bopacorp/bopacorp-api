@@ -6,7 +6,7 @@ import type {
   UpdateContentTypeRequest,
 } from '@bopacorp/shared/catalog';
 import { db } from '@lib/db.js';
-import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
+import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { and, asc, desc, eq, ilike, isNull, or } from 'drizzle-orm';
 import { contentBlocks, contentTypes } from '../../db/schema/catalog.js';
 
@@ -34,7 +34,7 @@ export async function createContentType(input: CreateContentTypeRequest) {
   const [type] = await db.insert(contentTypes).values(input).returning();
 
   if (!type) {
-    throw new Error('Failed to create content type');
+    throw new InternalServerError();
   }
 
   return type;
@@ -183,7 +183,7 @@ export async function createContentBlock(input: CreateContentBlockRequest, userI
     .returning(CONTENT_BLOCK_RESPONSE_COLUMNS);
 
   if (!block) {
-    throw new Error('Failed to create content block');
+    throw new InternalServerError();
   }
 
   return block;
