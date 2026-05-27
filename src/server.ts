@@ -3,6 +3,7 @@ import { logger } from '@lib/logger.js';
 import { authRoutes } from '@modules/auth/auth.routes.js';
 import { catalogRoutes } from '@modules/catalog/catalog.routes.js';
 import { catalogItemsRoutes } from '@modules/catalog-items/catalog-items.routes.js';
+import { cmsRoutes } from '@modules/cms/cms.routes.js';
 import { contactRequestsRoutes } from '@modules/contact-requests/contact-requests.routes.js';
 import { employabilityRoutes } from '@modules/employability/employability.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
@@ -44,6 +45,7 @@ app.use('/api/v1/catalog', authenticate, catalogRoutes);
 app.use('/api/v1/catalog-items', authenticate, catalogItemsRoutes);
 app.use('/api/v1/contact-requests', contactRequestsRoutes);
 app.use('/api/v1/employability', employabilityRoutes);
+app.use('/api/v1/cms', cmsRoutes);
 app.use('/api/v1/auth', authRoutes);
 
 app.use((req, _res) => {
