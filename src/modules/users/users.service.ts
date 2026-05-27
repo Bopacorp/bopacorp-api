@@ -1,35 +1,12 @@
 import type { CreateUserRequest, ListUsersQuery, UpdateUserRequest } from '@bopacorp/shared/auth';
-import { auditLogs, roles, userRoles, users } from '@db/schema/auth.js';
+import { roles, userRoles, users } from '@db/schema/auth.js';
 import { profiles } from '@db/schema/core.js';
+import { createAuditLog } from '@lib/audit.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import bcrypt from 'bcrypt';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-
-async function createAuditLog(params: {
-  tableName: string;
-  recordId: string;
-  operation: 'I' | 'U' | 'D';
-  userId: string;
-  oldData?: Record<string, unknown>;
-  newData?: Record<string, unknown>;
-  ipAddress?: string;
-  userAgent?: string;
-  notes?: string;
-}) {
-  await db.insert(auditLogs).values({
-    tableName: params.tableName,
-    recordId: params.recordId,
-    operation: params.operation,
-    userId: params.userId,
-    oldData: params.oldData ?? null,
-    newData: params.newData ?? null,
-    ipAddress: params.ipAddress ?? null,
-    userAgent: params.userAgent ?? null,
-    notes: params.notes ?? null,
-  });
-}
 
 function getSortColumn(sortBy: string | undefined): AnyPgColumn {
   switch (sortBy) {

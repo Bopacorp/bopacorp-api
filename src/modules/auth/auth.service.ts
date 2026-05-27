@@ -6,14 +6,8 @@ import type {
   ResetPasswordRequest,
 } from '@bopacorp/shared/auth';
 import { env } from '@config/env.js';
-import {
-  auditLogs,
-  authTokens,
-  loginLogs,
-  permissions,
-  rolePermissions,
-  users,
-} from '@db/schema/auth.js';
+import { authTokens, loginLogs, permissions, rolePermissions, users } from '@db/schema/auth.js';
+import { createAuditLog } from '@lib/audit.js';
 import { db } from '@lib/db.js';
 import { createModuleLogger } from '@lib/logger.js';
 import { HttpError, NotFoundError, UnauthorizedError } from '@shared/errors/http-error.js';
@@ -86,30 +80,6 @@ async function createLoginLog(params: {
     status: params.status,
     ipAddress: params.ipAddress ?? null,
     userAgent: params.userAgent ?? null,
-  });
-}
-
-async function createAuditLog(params: {
-  tableName: string;
-  recordId: string;
-  operation: 'I' | 'U' | 'D';
-  userId: string;
-  oldData?: Record<string, unknown> | undefined;
-  newData?: Record<string, unknown> | undefined;
-  ipAddress?: string | undefined;
-  userAgent?: string | undefined;
-  notes?: string | undefined;
-}) {
-  await db.insert(auditLogs).values({
-    tableName: params.tableName,
-    recordId: params.recordId,
-    operation: params.operation,
-    userId: params.userId,
-    oldData: params.oldData ?? null,
-    newData: params.newData ?? null,
-    ipAddress: params.ipAddress ?? null,
-    userAgent: params.userAgent ?? null,
-    notes: params.notes ?? null,
   });
 }
 
