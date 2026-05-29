@@ -15,54 +15,28 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 
   const token = authHeader.slice(7);
 
-  let payload: { sub: string; email: string };
+  let payload: { sub: string; email: string; roles: string[]; permissions: string[] };
 
   try {
-    payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; email: string };
+    payload = jwt.verify(token, env.JWT_SECRET) as typeof payload;
   } catch {
     throw new UnauthorizedError('Invalid or expired token');
   }
 
   const user = await db.query.users.findFirst({
     where: and(eq(users.id, payload.sub), isNull(users.deletedAt)),
-    with: {
-      userRoles: {
-        where: (ur, { eq }) => eq(ur.isActive, true),
-        with: {
-          role: true,
-        },
-      },
-    },
+    columns: { isActive: true },
   });
 
   if (!user?.isActive) {
     throw new UnauthorizedError('User inactive or deleted');
   }
 
-  const roleIds = user.userRoles.map((ur) => ur.roleId);
-
-  const permissions = new Set<string>();
-
-  if (roleIds.length > 0) {
-    const rolePerms = await db.query.rolePermissions.findMany({
-      where: (rp, { eq, and, inArray }) => and(eq(rp.isGranted, true), inArray(rp.roleId, roleIds)),
-      with: {
-        permission: true,
-      },
-    });
-
-    for (const rp of rolePerms) {
-      if (rp.permission?.code) {
-        permissions.add(rp.permission.code);
-      }
-    }
-  }
-
   req.user = {
-    id: user.id,
-    email: user.email,
-    roles: user.userRoles.map((ur) => ur.role.slug),
-    permissions: Array.from(permissions),
+    id: payload.sub,
+    email: payload.email,
+    roles: payload.roles,
+    permissions: payload.permissions,
   };
 
   next();

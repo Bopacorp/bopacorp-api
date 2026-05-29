@@ -21,8 +21,13 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function generateAccessToken(userId: string, email: string): string {
-  return jwt.sign({ sub: userId, email }, env.JWT_SECRET, {
+function generateAccessToken(
+  userId: string,
+  email: string,
+  roles: string[],
+  permissions: string[]
+): string {
+  return jwt.sign({ sub: userId, email, roles, permissions }, env.JWT_SECRET, {
     expiresIn: env.JWT_EXPIRES_IN,
   } as SignOptions);
 }
@@ -217,18 +222,6 @@ export const authService = {
 
     await cleanupExpiredRefreshTokens(user.id);
 
-    const accessToken = generateAccessToken(user.id, user.email);
-    const refreshTokenRaw = generateOpaqueToken();
-    const refreshTokenHash = hashToken(refreshTokenRaw);
-    const refreshExpiresAt = new Date(Date.now() + getRefreshExpiresInSeconds() * 1000);
-
-    await db.insert(authTokens).values({
-      userId: user.id,
-      token: refreshTokenHash,
-      type: 'refresh',
-      expiresAt: refreshExpiresAt,
-    });
-
     const roleIds = user.userRoles.map((ur) => ur.roleId);
     const permissionCodes = new Set<string>();
 
@@ -244,6 +237,23 @@ export const authService = {
         }
       }
     }
+
+    const accessToken = generateAccessToken(
+      user.id,
+      user.email,
+      user.userRoles.map((ur) => ur.role.slug),
+      Array.from(permissionCodes)
+    );
+    const refreshTokenRaw = generateOpaqueToken();
+    const refreshTokenHash = hashToken(refreshTokenRaw);
+    const refreshExpiresAt = new Date(Date.now() + getRefreshExpiresInSeconds() * 1000);
+
+    await db.insert(authTokens).values({
+      userId: user.id,
+      token: refreshTokenHash,
+      type: 'refresh',
+      expiresAt: refreshExpiresAt,
+    });
 
     return {
       user: {
@@ -315,7 +325,38 @@ export const authService = {
 
     await db.delete(authTokens).where(eq(authTokens.id, tokenRecord.id));
 
-    const accessToken = generateAccessToken(user.id, user.email);
+    const activeUserRoles = await db.query.userRoles.findMany({
+      where: (ur, { eq, and }) => and(eq(ur.userId, user.id), eq(ur.isActive, true)),
+      with: { role: true },
+    });
+
+    const refreshedRoleIds = activeUserRoles.map((ur) => ur.roleId);
+    const refreshedPermissionCodes = new Set<string>();
+
+    if (refreshedRoleIds.length > 0) {
+      const refreshedRolePerms = await db
+        .select({ code: permissions.code })
+        .from(rolePermissions)
+        .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+        .where(
+          and(
+            eq(rolePermissions.isGranted, true),
+            inArray(rolePermissions.roleId, refreshedRoleIds)
+          )
+        );
+      for (const rp of refreshedRolePerms) {
+        if (rp.code) {
+          refreshedPermissionCodes.add(rp.code);
+        }
+      }
+    }
+
+    const accessToken = generateAccessToken(
+      user.id,
+      user.email,
+      activeUserRoles.map((ur) => ur.role.slug),
+      Array.from(refreshedPermissionCodes)
+    );
     const newRefreshTokenRaw = generateOpaqueToken();
     const newRefreshTokenHash = hashToken(newRefreshTokenRaw);
     const refreshExpiresAt = new Date(Date.now() + getRefreshExpiresInSeconds() * 1000);
