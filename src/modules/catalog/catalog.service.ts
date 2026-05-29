@@ -92,7 +92,41 @@ const CONTENT_BLOCK_RESPONSE_COLUMNS = {
   sortOrder: contentBlocks.sortOrder,
   createdAt: contentBlocks.createdAt,
   updatedAt: contentBlocks.updatedAt,
+  contentTypeCode: contentTypes.code,
+  contentTypeName: contentTypes.name,
+  contentTypeIdJoined: contentTypes.id,
 };
+
+function buildContentBlockQuery() {
+  return db
+    .select(CONTENT_BLOCK_RESPONSE_COLUMNS)
+    .from(contentBlocks)
+    .leftJoin(contentTypes, eq(contentBlocks.contentTypeId, contentTypes.id));
+}
+
+type ContentBlockRow = Awaited<
+  ReturnType<ReturnType<typeof buildContentBlockQuery>['execute']>
+>[number];
+
+function toContentBlockResponse(row: ContentBlockRow) {
+  return {
+    id: row.id,
+    contentKey: row.contentKey,
+    contentTypeId: row.contentTypeId,
+    title: row.title,
+    body: row.body,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    contentType: row.contentTypeIdJoined
+      ? {
+          id: row.contentTypeIdJoined,
+          code: row.contentTypeCode,
+          name: row.contentTypeName,
+        }
+      : null,
+  };
+}
 
 function getSortColumn(sortBy: string | undefined) {
   switch (sortBy) {
@@ -115,8 +149,7 @@ export async function listContentBlocks(query: ListContentBlocksQuery) {
   const conditions = [isNull(contentBlocks.deletedAt)];
 
   if (query.contentTypeId) {
-    const cond = eq(contentBlocks.contentTypeId, query.contentTypeId);
-    if (cond) conditions.push(cond);
+    conditions.push(eq(contentBlocks.contentTypeId, query.contentTypeId));
   }
 
   if (query.search) {
@@ -135,16 +168,16 @@ export async function listContentBlocks(query: ListContentBlocksQuery) {
   const sortColumn = getSortColumn(query.sortBy);
   const orderFn = query.sortOrder === 'desc' ? desc : asc;
 
-  const rows = await db
-    .select(CONTENT_BLOCK_RESPONSE_COLUMNS)
-    .from(contentBlocks)
+  const rows = await buildContentBlockQuery()
     .where(where)
     .orderBy(orderFn(sortColumn))
     .limit(query.limit)
     .offset((query.page - 1) * query.limit);
 
+  const data = rows.map(toContentBlockResponse);
+
   return {
-    data: rows,
+    data,
     meta: {
       page: query.page,
       limit: query.limit,
@@ -155,16 +188,17 @@ export async function listContentBlocks(query: ListContentBlocksQuery) {
 }
 
 export async function getContentBlockById(id: string) {
-  const [block] = await db
-    .select(CONTENT_BLOCK_RESPONSE_COLUMNS)
-    .from(contentBlocks)
-    .where(and(eq(contentBlocks.id, id), isNull(contentBlocks.deletedAt)));
+  const rows = await buildContentBlockQuery().where(
+    and(eq(contentBlocks.id, id), isNull(contentBlocks.deletedAt))
+  );
+
+  const block = rows[0];
 
   if (!block) {
     throw new NotFoundError('Content block', id);
   }
 
-  return block;
+  return toContentBlockResponse(block);
 }
 
 export async function createContentBlock(input: CreateContentBlockRequest, userId: string) {
@@ -177,16 +211,23 @@ export async function createContentBlock(input: CreateContentBlockRequest, userI
     throw new ConflictError(`Content block with key '${input.contentKey}' already exists`);
   }
 
-  const [block] = await db
+  const [inserted] = await db
     .insert(contentBlocks)
     .values({ ...input, updatedBy: userId })
-    .returning(CONTENT_BLOCK_RESPONSE_COLUMNS);
+    .returning();
+
+  if (!inserted) {
+    throw new InternalServerError();
+  }
+
+  const rows = await buildContentBlockQuery().where(eq(contentBlocks.id, inserted.id));
+  const block = rows[0];
 
   if (!block) {
     throw new InternalServerError();
   }
 
-  return block;
+  return toContentBlockResponse(block);
 }
 
 export async function updateContentBlock(
@@ -214,13 +255,20 @@ export async function updateContentBlock(
     .update(contentBlocks)
     .set(updateData)
     .where(and(eq(contentBlocks.id, id), isNull(contentBlocks.deletedAt)))
-    .returning(CONTENT_BLOCK_RESPONSE_COLUMNS);
+    .returning();
 
   if (!updated) {
     throw new NotFoundError('Content block', id);
   }
 
-  return updated;
+  const rows = await buildContentBlockQuery().where(eq(contentBlocks.id, updated.id));
+  const block = rows[0];
+
+  if (!block) {
+    throw new InternalServerError();
+  }
+
+  return toContentBlockResponse(block);
 }
 
 function insertInputToUpdateData(input: UpdateContentBlockRequest, userId: string) {

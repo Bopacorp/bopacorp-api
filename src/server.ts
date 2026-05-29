@@ -4,7 +4,6 @@ import { authRoutes } from '@modules/auth/auth.routes.js';
 import { catalogRoutes } from '@modules/catalog/catalog.routes.js';
 import { cmsRoutes } from '@modules/cms/cms.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
-import { authenticate } from '@shared/middleware/authenticate.js';
 import { errorHandler } from '@shared/middleware/error-handler.js';
 import cors from 'cors';
 import express from 'express';
@@ -38,7 +37,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/v1/catalog', authenticate, catalogRoutes);
+app.use('/api/v1/catalog', catalogRoutes);
 app.use('/api/v1/cms', cmsRoutes);
 app.use('/api/v1/auth', authRoutes);
 
