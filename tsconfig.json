@@ -8,6 +8,7 @@
     // Path Aliases
     "paths": {
       "@config/*": ["./src/config/*"],
+      "@db/*": ["./src/db/*"],
       "@lib/*": ["./src/lib/*"],
       "@modules/*": ["./src/modules/*"],
       "@shared/*": ["./src/shared/*"],

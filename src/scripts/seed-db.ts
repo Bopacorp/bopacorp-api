@@ -1,8 +1,8 @@
 import 'dotenv/config';
+import { modules, permissions, rolePermissions, roles } from '@db/schema/auth.js';
 import { closeDb, db } from '@lib/db.js';
 import type { InferSelectModel } from 'drizzle-orm';
 import { inArray } from 'drizzle-orm';
-import { modules, permissions, rolePermissions, roles } from '../db/schema/auth.js';
 
 type Role = InferSelectModel<typeof roles>;
 

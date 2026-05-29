@@ -1,6 +1,6 @@
 import 'dotenv/config';
+import { contentTypes } from '@db/schema/catalog.js';
 import { closeDb, db } from '@lib/db.js';
-import { contentTypes } from '../db/schema/catalog.js';
 
 const SEED_TYPES = [
   {
