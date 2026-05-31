@@ -3,8 +3,8 @@
 -- PostgreSQL · UUID PKs · 3NF · Prisma-ready
 -- Schema: core
 -- =============================================
--- 2 tables:
---   profiles, advisor_supervisors
+-- 4 tables:
+--   profiles, advisor_supervisors, org_roles, employees
 -- =============================================
 
 CREATE SCHEMA IF NOT EXISTS core;
@@ -44,3 +44,30 @@ CREATE TABLE core.advisor_supervisors (
 );
 
 CREATE INDEX idx_advisor_supervisors_supervisor ON core.advisor_supervisors(supervisor_id);
+
+-- 3. ORG_ROLES (HR-managed organizational role catalog — dynamic, no enums)
+CREATE TABLE core.org_roles (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    code        VARCHAR(50)  NOT NULL UNIQUE,
+    name        VARCHAR(100) NOT NULL,
+    department  VARCHAR(100),
+    level       INTEGER,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. EMPLOYEES (links users to organizational roles — one per user)
+CREATE TABLE core.employees (
+    user_id      UUID        PRIMARY KEY REFERENCES app_auth.users(id) ON DELETE CASCADE,
+    org_role_id  UUID        NOT NULL REFERENCES core.org_roles(id),
+    territory    VARCHAR(100),
+    hired_at     DATE,
+    is_active    BOOLEAN     DEFAULT TRUE,
+    created_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_at   TIMESTAMPTZ
+);
+
+CREATE INDEX idx_employees_org_role ON core.employees(org_role_id);
+CREATE INDEX idx_employees_active   ON core.employees(is_active) WHERE deleted_at IS NULL;

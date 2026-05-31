@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
+  integer,
   pgSchema,
   primaryKey,
   text,
@@ -61,5 +63,38 @@ export const advisorSupervisors = coreSchema.table(
     primaryKey({ columns: [t.advisorId, t.supervisorId] }),
     index('idx_advisor_supervisors_supervisor').on(t.supervisorId),
     check('chk_no_self_supervision', sql`advisor_id <> supervisor_id`),
+  ]
+);
+
+export const orgRoles = coreSchema.table('org_roles', {
+  id: uuid().primaryKey().defaultRandom(),
+  code: varchar({ length: 50 }).notNull().unique(),
+  name: varchar({ length: 100 }).notNull(),
+  department: varchar({ length: 100 }),
+  level: integer(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+export const employees = coreSchema.table(
+  'employees',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    orgRoleId: uuid('org_role_id')
+      .notNull()
+      .references(() => orgRoles.id),
+    territory: varchar({ length: 100 }),
+    hiredAt: date('hired_at'),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('idx_employees_org_role').on(t.orgRoleId),
+    index('idx_employees_active').on(t.isActive).where(sql`deleted_at IS NULL`),
   ]
 );
