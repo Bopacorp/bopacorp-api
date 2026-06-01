@@ -1,7 +1,9 @@
 import type {
+  AssignAdvisorSupervisorsRequest,
   CreateDepartmentRequest,
   CreateEmployeeRequest,
   CreateOrgRoleRequest,
+  ListAdvisorSupervisorsQuery,
   ListDepartmentsQuery,
   ListEmployeesQuery,
   ListOrgRolesQuery,
@@ -114,4 +116,29 @@ export async function removeEmployee(req: Request<{ userId: string }>, res: Resp
   if (!req.user) throw new UnauthorizedError('Authentication required');
   await service.deleteEmployee(req.user.id, req.params.userId, getClientInfo(req));
   res.json({ success: true, data: { message: 'Employee deleted successfully' } });
+}
+
+// ── Advisor-Supervisors ──
+
+export async function listSupervisors(req: Request<{ userId: string }>, res: Response) {
+  const query = req.query as unknown as ListAdvisorSupervisorsQuery;
+  const result = await service.listSupervisors(req.params.userId, query);
+  res.json({ success: true, data: result.data, meta: result.meta });
+}
+
+export async function listAdvisors(req: Request<{ userId: string }>, res: Response) {
+  const query = req.query as unknown as ListAdvisorSupervisorsQuery;
+  const result = await service.listAdvisors(req.params.userId, query);
+  res.json({ success: true, data: result.data, meta: result.meta });
+}
+
+export async function assignSupervisors(req: Request<{ userId: string }>, res: Response) {
+  if (!req.user) throw new UnauthorizedError('Authentication required');
+  const data = await service.assignSupervisors(
+    req.user.id,
+    req.params.userId,
+    req.body as AssignAdvisorSupervisorsRequest,
+    getClientInfo(req)
+  );
+  res.json({ success: true, data: data.data, meta: data.meta });
 }

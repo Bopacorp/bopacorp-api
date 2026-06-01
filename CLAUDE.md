@@ -37,7 +37,7 @@ Stack: Express 5 + TypeScript 6 + Drizzle ORM + PostgreSQL (Supabase) + Zod 4 + 
 
 No `*.schema.ts` in modules — all Zod validation schemas live in `@bopacorp/shared`.
 
-**Current modules**: `auth`, `users`, `roles`, `profiles`, `catalog`, `catalog-items`, `cms`, `contact-requests`, `org`, `employability`.
+**Current modules**: `auth`, `users`, `roles`, `catalog`, `catalog-items`, `cms`, `contact-requests`, `org`, `employability`.
 
 **Dependency flow** (one-way): `routes → controller → service → db`. Never reverse. Never cross-import between modules.
 

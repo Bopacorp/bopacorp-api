@@ -1,7 +1,9 @@
 import {
+  AssignAdvisorSupervisorsRequestSchema,
   CreateDepartmentRequestSchema,
   CreateEmployeeRequestSchema,
   CreateOrgRoleRequestSchema,
+  ListAdvisorSupervisorsQuerySchema,
   ListDepartmentsQuerySchema,
   ListEmployeesQuerySchema,
   ListOrgRolesQuerySchema,
@@ -127,4 +129,27 @@ orgRoutes.delete(
   authorize('employees.delete'),
   validate({ params: UserIdParamSchema }),
   controller.removeEmployee
+);
+
+// ── Advisor-Supervisors ──
+
+orgRoutes.get(
+  '/employees/:userId/supervisors',
+  authorize('employees.read'),
+  validate({ params: UserIdParamSchema, query: ListAdvisorSupervisorsQuerySchema }),
+  controller.listSupervisors
+);
+
+orgRoutes.get(
+  '/employees/:userId/advisors',
+  authorize('employees.read'),
+  validate({ params: UserIdParamSchema, query: ListAdvisorSupervisorsQuerySchema }),
+  controller.listAdvisors
+);
+
+orgRoutes.put(
+  '/employees/:userId/supervisors',
+  authorize('employees.supervisors.update'),
+  validate({ params: UserIdParamSchema, body: AssignAdvisorSupervisorsRequestSchema }),
+  controller.assignSupervisors
 );
