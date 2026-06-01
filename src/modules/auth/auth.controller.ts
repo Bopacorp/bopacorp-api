@@ -59,4 +59,12 @@ export const authController = {
     await authService.changePassword(userId, { ...data, ...getClientInfo(req) });
     res.json({ success: true, data: { message: 'Password changed successfully' } });
   },
+
+  async getMe(req: Request, res: Response) {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+    const data = await authService.getMe(req.user.id);
+    res.json({ success: true, data });
+  },
 };

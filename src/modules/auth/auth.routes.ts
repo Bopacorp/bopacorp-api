@@ -26,6 +26,7 @@ authRoutes.post(
   validate({ body: ResetPasswordRequestSchema }),
   authController.resetPassword
 );
+authRoutes.get('/me', authenticate, authController.getMe);
 authRoutes.patch(
   '/change-password',
   authenticate,

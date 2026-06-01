@@ -483,4 +483,43 @@ export const authService = {
       notes: 'Password changed by user',
     });
   },
+
+  async getMe(userId: string) {
+    const user = await db.query.users.findFirst({
+      where: and(eq(users.id, userId), isNull(users.deletedAt)),
+      with: {
+        profile: true,
+        userRoles: {
+          where: (ur, { eq }) => eq(ur.isActive, true),
+          with: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!user?.isActive) {
+      throw new UnauthorizedError('User not found or inactive');
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      roles: user.userRoles.map((ur) => ur.role.slug),
+      profile: user.profile
+        ? {
+            id: user.profile.id,
+            firstName: user.profile.firstName,
+            secondName: user.profile.secondName,
+            lastName: user.profile.lastName,
+            secondLastName: user.profile.secondLastName,
+            nationalId: user.profile.nationalId,
+            phone: user.profile.phone,
+            avatarUrl: user.profile.avatarUrl,
+            address: user.profile.address,
+          }
+        : null,
+    };
+  },
 };
