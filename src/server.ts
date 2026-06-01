@@ -7,6 +7,7 @@ import { cmsRoutes } from '@modules/cms/cms.routes.js';
 import { contactRequestsRoutes } from '@modules/contact-requests/contact-requests.routes.js';
 import { employabilityRoutes } from '@modules/employability/employability.routes.js';
 import { orgRoutes } from '@modules/org/org.routes.js';
+import { rolesRoutes } from '@modules/roles/roles.routes.js';
 import { usersRoutes } from '@modules/users/users.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
 import { authenticate } from '@shared/middleware/authenticate.js';
@@ -50,6 +51,7 @@ app.use('/api/v1/employability', employabilityRoutes);
 app.use('/api/v1/cms', cmsRoutes);
 app.use('/api/v1/users', authenticate, usersRoutes);
 app.use('/api/v1/org', authenticate, orgRoutes);
+app.use('/api/v1/roles', authenticate, rolesRoutes);
 app.use('/api/v1/auth', authRoutes);
 
 app.use((req, _res) => {
