@@ -32,7 +32,7 @@ import {
   tiers,
   voiceDetails,
 } from './catalog.js';
-import { advisorSupervisors, employees, orgRoles, profiles } from './core.js';
+import { advisorSupervisors, departments, employees, orgRoles, profiles } from './core.js';
 import { candidateResumes, candidates, jobApplications, jobVacancies } from './employability.js';
 
 export const modulesRelations = relations(modules, ({ one, many }) => ({
@@ -302,7 +302,15 @@ export const advisorSupervisorsRelations = relations(advisorSupervisors, ({ one 
   }),
 }));
 
-export const orgRolesRelations = relations(orgRoles, ({ many }) => ({
+export const departmentsRelations = relations(departments, ({ many }) => ({
+  orgRoles: many(orgRoles),
+}));
+
+export const orgRolesRelations = relations(orgRoles, ({ one, many }) => ({
+  department: one(departments, {
+    fields: [orgRoles.departmentId],
+    references: [departments.id],
+  }),
   employees: many(employees),
 }));
 

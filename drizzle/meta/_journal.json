@@ -29,6 +29,20 @@
       "when": 1780271203442,
       "tag": "0003_skinny_donald_blake",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780272542618,
+      "tag": "0004_fuzzy_arachne",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780272659099,
+      "tag": "0005_light_thanos",
+      "breakpoints": true
     }
   ]
 }

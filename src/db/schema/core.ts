@@ -4,7 +4,6 @@ import {
   check,
   date,
   index,
-  integer,
   pgSchema,
   primaryKey,
   text,
@@ -62,23 +61,35 @@ export const advisorSupervisors = coreSchema.table(
   ]
 );
 
-export const orgRoles = coreSchema.table('org_roles', {
+export const departments = coreSchema.table('departments', {
   id: uuid().primaryKey().defaultRandom(),
   code: varchar({ length: 50 }).notNull().unique(),
   name: varchar({ length: 100 }).notNull(),
-  department: varchar({ length: 100 }),
-  level: integer(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
+
+export const orgRoles = coreSchema.table(
+  'org_roles',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    code: varchar({ length: 50 }).notNull().unique(),
+    name: varchar({ length: 100 }).notNull(),
+    departmentId: uuid('department_id').references(() => departments.id),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => [index('idx_org_roles_department').on(t.departmentId)]
+);
 
 export const employees = coreSchema.table(
   'employees',
   {
     userId: uuid('user_id')
       .primaryKey()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'restrict' }),
     orgRoleId: uuid('org_role_id')
       .notNull()
       .references(() => orgRoles.id),

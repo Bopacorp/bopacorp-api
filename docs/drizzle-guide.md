@@ -15,7 +15,7 @@ Standard rules for working with Drizzle in this project. All team members and AI
 ```
 src/db/schema/
 ├── auth.ts              # pgSchema('app_auth') — 9 tables, 4 enums
-├── core.ts              # pgSchema('core') — 4 tables
+├── core.ts              # pgSchema('core') — 5 tables
 ├── catalog.ts           # pgSchema('catalog') — 20 tables
 ├── employability.ts     # pgSchema('employability') — 4 tables, 1 enum
 ├── relations.ts         # ALL relations for ALL schemas

@@ -97,7 +97,7 @@ API modules map to **business concerns**, not database schemas. One DB schema ca
 | DB Schema | Tables | API Modules |
 |-----------|--------|-------------|
 | `app_auth` | 9 tables | `auth` (login/tokens), `users` (CRUD), `roles` (RBAC admin) |
-| `core` | 4 tables | `profiles` (profiles, advisor assignments, org roles, employees) |
+| `core` | 5 tables | `profiles` (profiles, advisor assignments, departments, org roles, employees) |
 | `catalog` | 20 tables | `catalog` (items, categories, CMS) |
 | `employability` | 4 tables | `employability` (vacancies, candidates, applications) |
 
