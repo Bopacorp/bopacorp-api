@@ -66,7 +66,7 @@ catalogRoutes.patch(
 
 catalogRoutes.get(
   '/content-blocks',
-  // authorize('content_blocks.read'),
+  authorize('content_blocks.read'),
   validate({ query: ListContentBlocksQuerySchema }),
   controller.listContentBlocks
 );
