@@ -18,6 +18,7 @@ src/
 │   ├── roles/                     # CRUD roles, permissions, modules (RBAC admin)
 │   ├── profiles/                  # Profiles, advisor-supervisor assignments
 │   ├── catalog/                   # Service catalog, categories, CMS content
+│   ├── org/                       # Departments, org roles (organizational lookups)
 │   └── employability/             # Job vacancies, candidates, applications
 ├── shared/                        # Cross-cutting concerns
 │   ├── middleware/                 # Express middleware (auth, validation, errors)
@@ -97,7 +98,7 @@ API modules map to **business concerns**, not database schemas. One DB schema ca
 | DB Schema | Tables | API Modules |
 |-----------|--------|-------------|
 | `app_auth` | 9 tables | `auth` (login/tokens), `users` (CRUD), `roles` (RBAC admin) |
-| `core` | 5 tables | `profiles` (profiles, advisor assignments, departments, org roles, employees) |
+| `core` | 5 tables | `profiles` (profiles, advisor assignments), `org` (departments, org roles, employees) |
 | `catalog` | 20 tables | `catalog` (items, categories, CMS) |
 | `employability` | 4 tables | `employability` (vacancies, candidates, applications) |
 
@@ -113,6 +114,7 @@ import { usersRoutes } from '@modules/users/users.routes.js';
 import { rolesRoutes } from '@modules/roles/roles.routes.js';
 import { profilesRoutes } from '@modules/profiles/profiles.routes.js';
 import { catalogRoutes } from '@modules/catalog/catalog.routes.js';
+import { orgRoutes } from '@modules/org/org.routes.js';
 import { employabilityRoutes } from '@modules/employability/employability.routes.js';
 
 app.use('/api/v1/auth', authRoutes);
@@ -120,6 +122,7 @@ app.use('/api/v1/users', usersRoutes);
 app.use('/api/v1/roles', rolesRoutes);
 app.use('/api/v1/profiles', profilesRoutes);
 app.use('/api/v1/catalog', catalogRoutes);
+app.use('/api/v1/org', orgRoutes);
 app.use('/api/v1/employability', employabilityRoutes);
 ```
 
