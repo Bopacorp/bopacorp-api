@@ -76,8 +76,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   auditLogs: many(auditLogs),
   profile: one(profiles),
   employee: one(employees),
-  advisorOf: many(advisorSupervisors, { relationName: 'advisor' }),
-  supervisorOf: many(advisorSupervisors, { relationName: 'supervisor' }),
   contentBlocks: many(contentBlocks),
   contactRequests: many(contactRequests),
   jobVacancies: many(jobVacancies),
@@ -292,14 +290,14 @@ export const profilesRelations = relations(profiles, ({ one }) => ({
 }));
 
 export const advisorSupervisorsRelations = relations(advisorSupervisors, ({ one }) => ({
-  advisor: one(users, {
+  advisor: one(employees, {
     fields: [advisorSupervisors.advisorId],
-    references: [users.id],
+    references: [employees.userId],
     relationName: 'advisor',
   }),
-  supervisor: one(users, {
+  supervisor: one(employees, {
     fields: [advisorSupervisors.supervisorId],
-    references: [users.id],
+    references: [employees.userId],
     relationName: 'supervisor',
   }),
 }));
@@ -308,7 +306,7 @@ export const orgRolesRelations = relations(orgRoles, ({ many }) => ({
   employees: many(employees),
 }));
 
-export const employeesRelations = relations(employees, ({ one }) => ({
+export const employeesRelations = relations(employees, ({ one, many }) => ({
   user: one(users, {
     fields: [employees.userId],
     references: [users.id],
@@ -317,6 +315,8 @@ export const employeesRelations = relations(employees, ({ one }) => ({
     fields: [employees.orgRoleId],
     references: [orgRoles.id],
   }),
+  advisorOf: many(advisorSupervisors, { relationName: 'advisor' }),
+  supervisorOf: many(advisorSupervisors, { relationName: 'supervisor' }),
 }));
 
 // ── Employability ──

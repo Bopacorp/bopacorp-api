@@ -41,7 +41,7 @@
   },
   "homepage": "https://github.com/Bopacorp/bopacorp-api#readme",
   "dependencies": {
-    "@bopacorp/shared": "latest",
+    "@bopacorp/shared": "^0.1.6",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

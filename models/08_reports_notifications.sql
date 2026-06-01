@@ -22,7 +22,7 @@ CREATE SCHEMA IF NOT EXISTS reports;
 CREATE TABLE reports.sales_objectives (
     id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
     created_by          UUID          NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
-    advisor_id          UUID          REFERENCES app_auth.users(id) ON DELETE SET NULL,
+    advisor_id          UUID          REFERENCES core.employees(user_id) ON DELETE SET NULL,
     target_sales_amount DECIMAL(15,2) NOT NULL CHECK (target_sales_amount >= 0),
     target_closed_deals INTEGER       NOT NULL CHECK (target_closed_deals >= 0),
     period_start        DATE          NOT NULL,

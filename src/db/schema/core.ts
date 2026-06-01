@@ -32,7 +32,6 @@ export const profiles = coreSchema.table(
     nationalId: varchar('national_id', { length: 20 }).notNull().unique(),
     phone: varchar({ length: 20 }),
     avatarUrl: varchar('avatar_url', { length: 500 }),
-    employeeCode: varchar('employee_code', { length: 20 }).unique(),
     address: text(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -41,9 +40,6 @@ export const profiles = coreSchema.table(
   (t) => [
     index('idx_profiles_user').on(t.userId),
     uniqueIndex('idx_profiles_national_id').on(t.nationalId).where(sql`deleted_at IS NULL`),
-    index('idx_profiles_employee')
-      .on(t.employeeCode)
-      .where(sql`employee_code IS NOT NULL AND deleted_at IS NULL`),
   ]
 );
 
@@ -52,10 +48,10 @@ export const advisorSupervisors = coreSchema.table(
   {
     advisorId: uuid('advisor_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+      .references(() => employees.userId, { onDelete: 'restrict' }),
     supervisorId: uuid('supervisor_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+      .references(() => employees.userId, { onDelete: 'restrict' }),
     isActive: boolean('is_active').notNull().default(true),
     assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow(),
   },

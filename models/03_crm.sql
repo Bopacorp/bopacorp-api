@@ -36,7 +36,7 @@ CREATE TABLE crm.visit_types (
 -- 3. BUSINESS_CLIENTS (B2B prospects + active clients)
 CREATE TABLE crm.business_clients (
     id                       UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-    advisor_id               UUID          REFERENCES app_auth.users(id) ON DELETE SET NULL,
+    advisor_id               UUID          REFERENCES core.employees(user_id) ON DELETE SET NULL,
     ruc                      VARCHAR(13)   NOT NULL UNIQUE
                                            CONSTRAINT chk_ruc_format CHECK (char_length(ruc) = 13 AND ruc ~ '^[0-9]+$'),
     business_name            VARCHAR(200)  NOT NULL,
@@ -60,7 +60,7 @@ CREATE INDEX idx_business_clients_active  ON crm.business_clients(is_active) WHE
 CREATE TABLE crm.negotiations (
     id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id            UUID        NOT NULL REFERENCES crm.business_clients(id) ON DELETE CASCADE,
-    advisor_id           UUID        NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
+    advisor_id           UUID        NOT NULL REFERENCES core.employees(user_id) ON DELETE RESTRICT,
     state_id             UUID        NOT NULL REFERENCES crm.negotiation_states(id) ON DELETE RESTRICT,
     start_date           DATE        NOT NULL DEFAULT CURRENT_DATE,
     estimated_close_date DATE,
@@ -101,7 +101,7 @@ CREATE TABLE crm.visits (
     id                 UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
     negotiation_id     UUID           REFERENCES crm.negotiations(id) ON DELETE SET NULL,
     client_id          UUID           NOT NULL REFERENCES crm.business_clients(id) ON DELETE CASCADE,
-    advisor_id         UUID           NOT NULL REFERENCES app_auth.users(id) ON DELETE RESTRICT,
+    advisor_id         UUID           NOT NULL REFERENCES core.employees(user_id) ON DELETE RESTRICT,
     verified_by        UUID           REFERENCES app_auth.users(id) ON DELETE SET NULL,
     visit_type_id      UUID           NOT NULL REFERENCES crm.visit_types(id) ON DELETE RESTRICT,
     visit_date         TIMESTAMPTZ    NOT NULL,

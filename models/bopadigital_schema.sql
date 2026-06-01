@@ -168,7 +168,6 @@ CREATE TABLE core.profiles (
     national_id      VARCHAR(20)  NOT NULL UNIQUE,
     phone            VARCHAR(20),
     avatar_url       VARCHAR(500),
-    employee_code    VARCHAR(20)  UNIQUE,
     address          TEXT,
     created_at       TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
@@ -177,7 +176,6 @@ CREATE TABLE core.profiles (
 
 CREATE INDEX idx_profiles_user        ON core.profiles(user_id);
 CREATE INDEX idx_profiles_national_id ON core.profiles(national_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_profiles_employee    ON core.profiles(employee_code) WHERE employee_code IS NOT NULL AND deleted_at IS NULL;
 
 -- 2. ADVISOR_SUPERVISORS (N:N — many supervisors can oversee many advisors)
 CREATE TABLE core.advisor_supervisors (

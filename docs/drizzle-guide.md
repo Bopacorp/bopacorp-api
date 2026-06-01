@@ -7,7 +7,7 @@ Standard rules for working with Drizzle in this project. All team members and AI
 - **ORM**: Drizzle ORM with `node-postgres` driver
 - **DB**: PostgreSQL (multi-schema: `app_auth`, `core`, `catalog`, `employability`)
 - **Schema location**: `src/db/schema/` (one file per PostgreSQL schema + one shared `relations.ts`)
-- **Migrations**: `drizzle/` (SQL files + journal tracked in git, snapshots ignored)
+- **Migrations**: `drizzle/` (SQL files + journal + snapshots tracked in git)
 - **Config**: `drizzle.config.ts` at project root
 
 ## Project Structure
@@ -15,7 +15,7 @@ Standard rules for working with Drizzle in this project. All team members and AI
 ```
 src/db/schema/
 ├── auth.ts              # pgSchema('app_auth') — 9 tables, 4 enums
-├── core.ts              # pgSchema('core') — 2 tables
+├── core.ts              # pgSchema('core') — 4 tables
 ├── catalog.ts           # pgSchema('catalog') — 20 tables
 ├── employability.ts     # pgSchema('employability') — 4 tables, 1 enum
 ├── relations.ts         # ALL relations for ALL schemas
@@ -25,7 +25,7 @@ drizzle/
 ├── 0000_xxx.sql         # Migration SQL (tracked by git)
 ├── meta/
 │   ├── _journal.json    # Migration index (tracked by git — needed for db:migrate)
-│   └── *_snapshot.json  # Schema snapshots (NOT tracked — regenerated locally)
+│   └── *_snapshot.json  # Schema snapshots (tracked by git — needed for incremental migrations)
 ```
 
 ## Commands
@@ -404,6 +404,6 @@ Example: adding `reporting` from `08_reports_notifications.sql`.
 | Missing `.js` extension on import | Always use `.js`: `import { users } from './auth.js'` |
 | Using `number` mode for decimal | Keep default (string) — avoids floating point precision loss |
 | Forgot to add schema to `schemaFilter` | Add to `drizzle.config.ts` or `db:generate` won't see it |
-| Snapshot committed to git | Only `_journal.json` needs tracking, snapshots are gitignored |
+| Snapshots missing from git | Both `_journal.json` and `*_snapshot.json` must be tracked — snapshots are required for incremental migrations |
 | CHECK as raw SQL when values are fixed | Use `pgEnum` — type-safe, reusable |
 | Defining relation only on one side | Both sides required — parent `many()` and child `one()` with fields |

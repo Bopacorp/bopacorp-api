@@ -67,7 +67,6 @@ export async function listUsers(query: ListUsersQuery) {
       firstName: profiles.firstName,
       lastName: profiles.lastName,
       avatarUrl: profiles.avatarUrl,
-      employeeCode: profiles.employeeCode,
     })
     .from(users)
     .leftJoin(profiles, eq(users.id, profiles.userId))
@@ -111,7 +110,6 @@ export async function listUsers(query: ListUsersQuery) {
             firstName: row.firstName,
             lastName: row.lastName,
             avatarUrl: row.avatarUrl,
-            employeeCode: row.employeeCode,
           }
         : null,
       roles: rolesByUser.get(row.id) ?? [],
@@ -158,7 +156,6 @@ export async function getUserById(id: string) {
           nationalId: user.profile.nationalId,
           phone: user.profile.phone,
           avatarUrl: user.profile.avatarUrl,
-          employeeCode: user.profile.employeeCode,
           address: user.profile.address,
         }
       : null,
@@ -219,7 +216,6 @@ export async function createUser(
       nationalId: data.profile.nationalId,
       phone: data.profile.phone,
       avatarUrl: data.profile.avatarUrl,
-      employeeCode: data.profile.employeeCode,
       address: data.profile.address,
     });
 
@@ -290,8 +286,6 @@ export async function updateUser(
       if (data.profile.nationalId !== undefined) profileUpdate.nationalId = data.profile.nationalId;
       if (data.profile.phone !== undefined) profileUpdate.phone = data.profile.phone;
       if (data.profile.avatarUrl !== undefined) profileUpdate.avatarUrl = data.profile.avatarUrl;
-      if (data.profile.employeeCode !== undefined)
-        profileUpdate.employeeCode = data.profile.employeeCode;
       if (data.profile.address !== undefined) profileUpdate.address = data.profile.address;
 
       if (Object.keys(profileUpdate).length > 1) {

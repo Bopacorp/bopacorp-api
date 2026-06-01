@@ -52,7 +52,7 @@ No `*.schema.ts` in modules — all Zod validation schemas live in `@bopacorp/sh
 | Schema | File | Tables | Source SQL |
 |--------|------|--------|-----------|
 | `app_auth` | `auth.ts` | 9 tables, 4 enums | `models/01_auth_rbac.sql` |
-| `core` | `core.ts` | 2 tables | `models/02_profiles.sql` |
+| `core` | `core.ts` | 4 tables | `models/02_profiles.sql` |
 | `catalog` | `catalog.ts` | 20 tables | `models/04_catalog.sql` |
 | `employability` | `employability.ts` | 4 tables, 1 enum | `models/07_employability.sql` |
 

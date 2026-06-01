@@ -272,7 +272,6 @@ export const authService = {
               nationalId: user.profile.nationalId,
               phone: user.profile.phone,
               avatarUrl: user.profile.avatarUrl,
-              employeeCode: user.profile.employeeCode,
               address: user.profile.address,
             }
           : null,
