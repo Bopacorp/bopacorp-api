@@ -18,7 +18,7 @@ src/
 │   ├── roles/                     # CRUD roles, permissions, modules (RBAC admin)
 │   ├── profiles/                  # Profiles, advisor-supervisor assignments
 │   ├── catalog/                   # Service catalog, categories, CMS content
-│   ├── org/                       # Departments, org roles (organizational lookups)
+│   ├── org/                       # Departments, org roles, employees (organizational structure)
 │   └── employability/             # Job vacancies, candidates, applications
 ├── shared/                        # Cross-cutting concerns
 │   ├── middleware/                 # Express middleware (auth, validation, errors)

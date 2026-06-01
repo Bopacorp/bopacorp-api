@@ -1,10 +1,14 @@
 import {
   CreateDepartmentRequestSchema,
+  CreateEmployeeRequestSchema,
   CreateOrgRoleRequestSchema,
   ListDepartmentsQuerySchema,
+  ListEmployeesQuerySchema,
   ListOrgRolesQuerySchema,
   UpdateDepartmentRequestSchema,
+  UpdateEmployeeRequestSchema,
   UpdateOrgRoleRequestSchema,
+  UserIdParamSchema,
 } from '@bopacorp/shared/core';
 import { authorize } from '@shared/middleware/authorize.js';
 import { validate } from '@shared/middleware/validate.js';
@@ -86,4 +90,41 @@ orgRoutes.patch(
   authorize('org_roles.delete'),
   validate({ params: IdParamSchema }),
   controller.disableOrgRole
+);
+
+// ── Employees ──
+
+orgRoutes.get(
+  '/employees',
+  authorize('employees.read'),
+  validate({ query: ListEmployeesQuerySchema }),
+  controller.listEmployees
+);
+
+orgRoutes.get(
+  '/employees/:userId',
+  authorize('employees.read'),
+  validate({ params: UserIdParamSchema }),
+  controller.getEmployeeByUserId
+);
+
+orgRoutes.post(
+  '/employees',
+  authorize('employees.create'),
+  validate({ body: CreateEmployeeRequestSchema }),
+  controller.createEmployee
+);
+
+orgRoutes.patch(
+  '/employees/:userId',
+  authorize('employees.update'),
+  validate({ params: UserIdParamSchema, body: UpdateEmployeeRequestSchema }),
+  controller.updateEmployee
+);
+
+orgRoutes.delete(
+  '/employees/:userId',
+  authorize('employees.delete'),
+  validate({ params: UserIdParamSchema }),
+  controller.removeEmployee
 );
