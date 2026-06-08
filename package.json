@@ -16,6 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "seed:cms:about": "tsx src/scripts/seed-cms-about.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "prepare": "husky"
@@ -41,7 +42,7 @@
   },
   "homepage": "https://github.com/Bopacorp/bopacorp-api#readme",
   "dependencies": {
-    "@bopacorp/shared": "^0.2.1",
+    "@bopacorp/shared": "latest",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
