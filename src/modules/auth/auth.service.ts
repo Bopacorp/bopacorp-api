@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type {
   ChangePasswordRequest,
   LoginRequest,
+  MeResponse,
   RefreshTokenRequest,
   ResetPasswordRequest,
 } from '@bopacorp/shared/auth';
@@ -484,7 +485,7 @@ export const authService = {
     });
   },
 
-  async getMe(userId: string) {
+  async getMe(userId: string): Promise<MeResponse> {
     const user = await db.query.users.findFirst({
       where: and(eq(users.id, userId), isNull(users.deletedAt)),
       with: {
