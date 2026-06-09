@@ -33,6 +33,14 @@ import {
   voiceDetails,
 } from './catalog.js';
 import { advisorSupervisors, departments, employees, orgRoles, profiles } from './core.js';
+import {
+  businessClients,
+  negotiationStateHistory,
+  negotiationStates,
+  negotiations,
+  visits,
+  visitTypes,
+} from './crm.js';
 import { candidateResumes, candidates, jobApplications, jobVacancies } from './employability.js';
 
 export const modulesRelations = relations(modules, ({ one, many }) => ({
@@ -80,6 +88,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   contactRequests: many(contactRequests),
   jobVacancies: many(jobVacancies),
   reviewedApplications: many(jobApplications),
+  verifiedVisits: many(visits, { relationName: 'verifiedBy' }),
+  stateHistoryChanges: many(negotiationStateHistory, { relationName: 'changedBy' }),
 }));
 
 export const userRolesRelations = relations(userRoles, ({ one }) => ({
@@ -325,6 +335,9 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
   }),
   advisorOf: many(advisorSupervisors, { relationName: 'advisor' }),
   supervisorOf: many(advisorSupervisors, { relationName: 'supervisor' }),
+  businessClients: many(businessClients),
+  negotiations: many(negotiations),
+  visits: many(visits),
 }));
 
 // ── Employability ──
@@ -366,5 +379,86 @@ export const candidateResumesRelations = relations(candidateResumes, ({ one }) =
   application: one(jobApplications, {
     fields: [candidateResumes.applicationId],
     references: [jobApplications.id],
+  }),
+}));
+
+// ── CRM ──
+
+export const negotiationStatesRelations = relations(negotiationStates, ({ many }) => ({
+  negotiations: many(negotiations),
+  stateHistory: many(negotiationStateHistory),
+}));
+
+export const visitTypesRelations = relations(visitTypes, ({ many }) => ({
+  visits: many(visits),
+}));
+
+export const businessClientsRelations = relations(businessClients, ({ one, many }) => ({
+  advisor: one(employees, {
+    fields: [businessClients.advisorId],
+    references: [employees.userId],
+  }),
+  negotiations: many(negotiations),
+  visits: many(visits),
+}));
+
+export const negotiationsRelations = relations(negotiations, ({ one, many }) => ({
+  client: one(businessClients, {
+    fields: [negotiations.clientId],
+    references: [businessClients.id],
+  }),
+  advisor: one(employees, {
+    fields: [negotiations.advisorId],
+    references: [employees.userId],
+  }),
+  state: one(negotiationStates, {
+    fields: [negotiations.stateId],
+    references: [negotiationStates.id],
+  }),
+  visits: many(visits),
+  stateHistory: many(negotiationStateHistory),
+}));
+
+export const visitsRelations = relations(visits, ({ one }) => ({
+  negotiation: one(negotiations, {
+    fields: [visits.negotiationId],
+    references: [negotiations.id],
+  }),
+  client: one(businessClients, {
+    fields: [visits.clientId],
+    references: [businessClients.id],
+  }),
+  advisor: one(employees, {
+    fields: [visits.advisorId],
+    references: [employees.userId],
+  }),
+  verifiedBy: one(users, {
+    fields: [visits.verifiedBy],
+    references: [users.id],
+    relationName: 'verifiedBy',
+  }),
+  visitType: one(visitTypes, {
+    fields: [visits.visitTypeId],
+    references: [visitTypes.id],
+  }),
+}));
+
+export const negotiationStateHistoryRelations = relations(negotiationStateHistory, ({ one }) => ({
+  negotiation: one(negotiations, {
+    fields: [negotiationStateHistory.negotiationId],
+    references: [negotiations.id],
+  }),
+  previousState: one(negotiationStates, {
+    fields: [negotiationStateHistory.previousStateId],
+    references: [negotiationStates.id],
+  }),
+  newState: one(negotiationStates, {
+    fields: [negotiationStateHistory.newStateId],
+    references: [negotiationStates.id],
+  }),
+  changedBy: one(users, {
+    fields: [negotiationStateHistory.changedBy],
+    references: [users.id],
+    relationName: 'changedBy',
   }),
 }));

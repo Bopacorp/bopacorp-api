@@ -43,6 +43,13 @@
       "when": 1780272659099,
       "tag": "0005_light_thanos",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780971431183,
+      "tag": "0006_legal_banshee",
+      "breakpoints": true
     }
   ]
 }
