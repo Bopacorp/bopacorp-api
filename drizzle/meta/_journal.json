@@ -50,6 +50,13 @@
       "when": 1780971431183,
       "tag": "0006_legal_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781059104123,
+      "tag": "0007_spotty_the_executioner",
+      "breakpoints": true
     }
   ]
 }

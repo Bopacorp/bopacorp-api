@@ -42,6 +42,12 @@ import {
   visitTypes,
 } from './crm.js';
 import { candidateResumes, candidates, jobApplications, jobVacancies } from './employability.js';
+import {
+  matrixAttachments,
+  matrixLineItems,
+  matrixStateHistory,
+  offerMatrices,
+} from './matrices.js';
 
 export const modulesRelations = relations(modules, ({ one, many }) => ({
   parent: one(modules, {
@@ -90,6 +96,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   reviewedApplications: many(jobApplications),
   verifiedVisits: many(visits, { relationName: 'verifiedBy' }),
   stateHistoryChanges: many(negotiationStateHistory, { relationName: 'changedBy' }),
+  createdMatrices: many(offerMatrices, { relationName: 'matrixCreator' }),
+  approvedMatrices: many(offerMatrices, { relationName: 'matrixApprover' }),
+  matrixAttachments: many(matrixAttachments),
+  matrixStateChanges: many(matrixStateHistory),
 }));
 
 export const userRolesRelations = relations(userRoles, ({ one }) => ({
@@ -167,6 +177,7 @@ export const catalogItemsRelations = relations(catalogItems, ({ one, many }) => 
   legalConditions: one(legalConditions),
   temporalConditions: one(temporalConditions),
   contactRequests: many(contactRequests),
+  matrixLineItems: many(matrixLineItems),
 }));
 
 export const voiceDetailsRelations = relations(voiceDetails, ({ one }) => ({
@@ -417,6 +428,7 @@ export const negotiationsRelations = relations(negotiations, ({ one, many }) => 
   }),
   visits: many(visits),
   stateHistory: many(negotiationStateHistory),
+  offerMatrices: many(offerMatrices),
 }));
 
 export const visitsRelations = relations(visits, ({ one }) => ({
@@ -460,5 +472,60 @@ export const negotiationStateHistoryRelations = relations(negotiationStateHistor
     fields: [negotiationStateHistory.changedBy],
     references: [users.id],
     relationName: 'changedBy',
+  }),
+}));
+
+// ── Matrices ──
+
+export const offerMatricesRelations = relations(offerMatrices, ({ one, many }) => ({
+  negotiation: one(negotiations, {
+    fields: [offerMatrices.negotiationId],
+    references: [negotiations.id],
+  }),
+  creator: one(users, {
+    fields: [offerMatrices.creatorId],
+    references: [users.id],
+    relationName: 'matrixCreator',
+  }),
+  approvedBy: one(users, {
+    fields: [offerMatrices.approvedBy],
+    references: [users.id],
+    relationName: 'matrixApprover',
+  }),
+  lineItems: many(matrixLineItems),
+  attachments: many(matrixAttachments),
+  stateHistory: many(matrixStateHistory),
+}));
+
+export const matrixLineItemsRelations = relations(matrixLineItems, ({ one }) => ({
+  matrix: one(offerMatrices, {
+    fields: [matrixLineItems.matrixId],
+    references: [offerMatrices.id],
+  }),
+  item: one(catalogItems, {
+    fields: [matrixLineItems.itemId],
+    references: [catalogItems.id],
+  }),
+}));
+
+export const matrixAttachmentsRelations = relations(matrixAttachments, ({ one }) => ({
+  matrix: one(offerMatrices, {
+    fields: [matrixAttachments.matrixId],
+    references: [offerMatrices.id],
+  }),
+  uploadedBy: one(users, {
+    fields: [matrixAttachments.uploadedBy],
+    references: [users.id],
+  }),
+}));
+
+export const matrixStateHistoryRelations = relations(matrixStateHistory, ({ one }) => ({
+  matrix: one(offerMatrices, {
+    fields: [matrixStateHistory.matrixId],
+    references: [offerMatrices.id],
+  }),
+  changedBy: one(users, {
+    fields: [matrixStateHistory.changedBy],
+    references: [users.id],
   }),
 }));
