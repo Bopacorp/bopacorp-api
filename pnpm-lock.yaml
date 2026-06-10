@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@bopacorp/shared':
-        specifier: latest
-        version: 0.2.1
+        specifier: 0.2.5
+        version: 0.2.5
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -202,8 +202,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@bopacorp/shared@0.2.1':
-    resolution: {integrity: sha512-7xEvJTHMh3VMjWDjqmXxVwfijI4Iz5lcNtUFrfczK7G0vszoVUvji63zqwo7mqwMjZLafd0LmXX9FJs/Fo09WA==, tarball: https://npm.pkg.github.com/download/@bopacorp/shared/0.2.1/1a5d89e2343b3558d9ab866ba3deff0a067785d9}
+  '@bopacorp/shared@0.2.5':
+    resolution: {integrity: sha512-Fh/8hExrLxZMPKJBBuawx0GJGKZIdoRLGYkI4lLpVP5M0sy4LLiFg+UWNN1VlvuyslIVil1uf2Rws1OnnIbXDQ==, tarball: https://npm.pkg.github.com/download/@bopacorp/shared/0.2.5/40317085267d1d1dc6bcfc58ea5d7bbdfaa354aa}
 
   '@commitlint/cli@21.0.2':
     resolution: {integrity: sha512-YMmfLbqBg+ZRvvmPhc+cilSQFrh/AgzVgCT1U/OifmUZEwPbvCtA8rN//YNaF9d5eoZphxVMGYtmwA2QgQORgg==}
@@ -2492,7 +2492,7 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.16':
     optional: true
 
-  '@bopacorp/shared@0.2.1':
+  '@bopacorp/shared@0.2.5':
     dependencies:
       zod: 4.4.3
 
