@@ -5,6 +5,7 @@ import { catalogRoutes } from '@modules/catalog/catalog.routes.js';
 import { catalogItemsRoutes } from '@modules/catalog-items/catalog-items.routes.js';
 import { cmsRoutes } from '@modules/cms/cms.routes.js';
 import { contactRequestsRoutes } from '@modules/contact-requests/contact-requests.routes.js';
+import { crmRoutes } from '@modules/crm/crm.routes.js';
 import { employabilityRoutes } from '@modules/employability/employability.routes.js';
 import { orgRoutes } from '@modules/org/org.routes.js';
 import { rolesRoutes } from '@modules/roles/roles.routes.js';
@@ -47,6 +48,7 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/catalog', authenticate, catalogRoutes);
 app.use('/api/v1/catalog-items', authenticate, catalogItemsRoutes);
 app.use('/api/v1/contact-requests', contactRequestsRoutes);
+app.use('/api/v1/crm', authenticate, crmRoutes);
 app.use('/api/v1/employability', employabilityRoutes);
 app.use('/api/v1/cms', cmsRoutes);
 app.use('/api/v1/users', authenticate, usersRoutes);
