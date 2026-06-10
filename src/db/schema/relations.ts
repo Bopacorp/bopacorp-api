@@ -41,6 +41,7 @@ import {
   visits,
   visitTypes,
 } from './crm.js';
+import { documentStateHistory, documentTypes, negotiationDocuments } from './documents.js';
 import { candidateResumes, candidates, jobApplications, jobVacancies } from './employability.js';
 import {
   matrixAttachments,
@@ -100,6 +101,9 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   approvedMatrices: many(offerMatrices, { relationName: 'matrixApprover' }),
   matrixAttachments: many(matrixAttachments),
   matrixStateChanges: many(matrixStateHistory),
+  uploadedDocuments: many(negotiationDocuments, { relationName: 'documentUploader' }),
+  reviewedDocuments: many(negotiationDocuments, { relationName: 'documentReviewer' }),
+  documentStateChanges: many(documentStateHistory),
 }));
 
 export const userRolesRelations = relations(userRoles, ({ one }) => ({
@@ -429,6 +433,7 @@ export const negotiationsRelations = relations(negotiations, ({ one, many }) => 
   visits: many(visits),
   stateHistory: many(negotiationStateHistory),
   offerMatrices: many(offerMatrices),
+  documents: many(negotiationDocuments),
 }));
 
 export const visitsRelations = relations(visits, ({ one }) => ({
@@ -526,6 +531,45 @@ export const matrixStateHistoryRelations = relations(matrixStateHistory, ({ one 
   }),
   changedBy: one(users, {
     fields: [matrixStateHistory.changedBy],
+    references: [users.id],
+  }),
+}));
+
+// ── Documents ──
+
+export const documentTypesRelations = relations(documentTypes, ({ many }) => ({
+  negotiationDocuments: many(negotiationDocuments),
+}));
+
+export const negotiationDocumentsRelations = relations(negotiationDocuments, ({ one, many }) => ({
+  negotiation: one(negotiations, {
+    fields: [negotiationDocuments.negotiationId],
+    references: [negotiations.id],
+  }),
+  documentType: one(documentTypes, {
+    fields: [negotiationDocuments.documentTypeId],
+    references: [documentTypes.id],
+  }),
+  uploadedBy: one(users, {
+    fields: [negotiationDocuments.uploadedBy],
+    references: [users.id],
+    relationName: 'documentUploader',
+  }),
+  reviewedBy: one(users, {
+    fields: [negotiationDocuments.reviewedBy],
+    references: [users.id],
+    relationName: 'documentReviewer',
+  }),
+  stateHistory: many(documentStateHistory),
+}));
+
+export const documentStateHistoryRelations = relations(documentStateHistory, ({ one }) => ({
+  document: one(negotiationDocuments, {
+    fields: [documentStateHistory.documentId],
+    references: [negotiationDocuments.id],
+  }),
+  changedBy: one(users, {
+    fields: [documentStateHistory.changedBy],
     references: [users.id],
   }),
 }));
