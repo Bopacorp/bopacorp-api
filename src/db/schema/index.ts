@@ -5,4 +5,6 @@ export * from './crm.js';
 export * from './documents.js';
 export * from './employability.js';
 export * from './matrices.js';
+export * from './notifications.js';
 export * from './relations.js';
+export * from './reports.js';

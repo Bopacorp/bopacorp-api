@@ -49,6 +49,8 @@ import {
   matrixStateHistory,
   offerMatrices,
 } from './matrices.js';
+import { notifications } from './notifications.js';
+import { reportExports, salesObjectives } from './reports.js';
 
 export const modulesRelations = relations(modules, ({ one, many }) => ({
   parent: one(modules, {
@@ -104,6 +106,9 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   uploadedDocuments: many(negotiationDocuments, { relationName: 'documentUploader' }),
   reviewedDocuments: many(negotiationDocuments, { relationName: 'documentReviewer' }),
   documentStateChanges: many(documentStateHistory),
+  createdObjectives: many(salesObjectives, { relationName: 'objectiveCreator' }),
+  generatedReports: many(reportExports, { relationName: 'reportGenerator' }),
+  receivedNotifications: many(notifications),
 }));
 
 export const userRolesRelations = relations(userRoles, ({ one }) => ({
@@ -353,6 +358,7 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
   businessClients: many(businessClients),
   negotiations: many(negotiations),
   visits: many(visits),
+  assignedObjectives: many(salesObjectives),
 }));
 
 // ── Employability ──
@@ -570,6 +576,37 @@ export const documentStateHistoryRelations = relations(documentStateHistory, ({ 
   }),
   changedBy: one(users, {
     fields: [documentStateHistory.changedBy],
+    references: [users.id],
+  }),
+}));
+
+// ── Reports ──
+
+export const salesObjectivesRelations = relations(salesObjectives, ({ one }) => ({
+  creator: one(users, {
+    fields: [salesObjectives.createdBy],
+    references: [users.id],
+    relationName: 'objectiveCreator',
+  }),
+  advisor: one(employees, {
+    fields: [salesObjectives.advisorId],
+    references: [employees.userId],
+  }),
+}));
+
+export const reportExportsRelations = relations(reportExports, ({ one }) => ({
+  generator: one(users, {
+    fields: [reportExports.generatedBy],
+    references: [users.id],
+    relationName: 'reportGenerator',
+  }),
+}));
+
+// ── Notifications ──
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  recipient: one(users, {
+    fields: [notifications.recipientId],
     references: [users.id],
   }),
 }));
