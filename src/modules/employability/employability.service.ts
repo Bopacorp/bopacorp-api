@@ -1,6 +1,7 @@
+import crypto from 'node:crypto';
 import type {
+  ApplyJobVacancyRequest,
   CreateCandidateRequest,
-  CreateCandidateResumeRequest,
   CreateJobApplicationRequest,
   CreateJobVacancyRequest,
   ListCandidateResumesQuery,
@@ -10,6 +11,7 @@ import type {
   UpdateCandidateRequest,
   UpdateJobApplicationRequest,
   UpdateJobVacancyRequest,
+  UploadCandidateResumeRequest,
 } from '@bopacorp/shared/employability';
 import { users } from '@db/schema/auth.js';
 import {
@@ -19,6 +21,7 @@ import {
   jobVacancies,
 } from '@db/schema/employability.js';
 import { db } from '@lib/db.js';
+import { deleteFile, downloadFile, uploadFile } from '@lib/storage.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { and, eq, gte, ilike, isNull, or } from 'drizzle-orm';
 
@@ -200,6 +203,139 @@ export async function listPublishedVacancies(query: ListJobVacanciesQuery) {
   };
 }
 
+// --- Public Apply ---
+
+export async function applyJobVacancy(
+  data: ApplyJobVacancyRequest,
+  fileBuffer: Buffer,
+  originalName: string,
+  fileSizeBytes: number,
+  mimeType: string
+) {
+  const vacancy = await db.query.jobVacancies.findFirst({
+    where: and(
+      eq(jobVacancies.id, data.vacancyId),
+      eq(jobVacancies.isPublished, true),
+      eq(jobVacancies.isActive, true),
+      isNull(jobVacancies.deletedAt)
+    ),
+  });
+
+  if (!vacancy) {
+    throw new NotFoundError('Job vacancy', data.vacancyId);
+  }
+
+  const normalizedEmail = data.candidate.email.toLowerCase();
+
+  const existing = await db.query.candidates.findFirst({
+    where: eq(candidates.nationalId, data.candidate.nationalId),
+  });
+
+  let candidateId: string;
+
+  if (existing) {
+    candidateId = existing.id;
+  } else {
+    const [created] = await db
+      .insert(candidates)
+      .values({
+        nationalId: data.candidate.nationalId,
+        firstName: data.candidate.firstName,
+        lastName: data.candidate.lastName,
+        email: normalizedEmail,
+        phone: data.candidate.phone,
+        address: data.candidate.address,
+      })
+      .returning();
+
+    if (!created) {
+      throw new InternalServerError('Failed to create candidate');
+    }
+    candidateId = created.id;
+  }
+
+  const fileExtension = originalName.split('.').pop() ?? 'pdf';
+  const filename = `${crypto.randomUUID()}.${fileExtension}`;
+  const storagePath = `candidates/${candidateId}/${filename}`;
+
+  await uploadFile(storagePath, fileBuffer, mimeType);
+
+  const fileSizeMb = fileSizeBytes / (1024 * 1024);
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx
+        .update(candidates)
+        .set({
+          firstName: data.candidate.firstName,
+          lastName: data.candidate.lastName,
+          email: normalizedEmail,
+          phone: data.candidate.phone,
+          address: data.candidate.address,
+          updatedAt: new Date(),
+        })
+        .where(eq(candidates.id, candidateId));
+
+      const [resume] = await tx
+        .insert(candidateResumes)
+        .values({
+          candidateId,
+          filename: originalName,
+          fileExtension,
+          fileSizeMb: fileSizeMb.toFixed(2),
+          storagePath,
+          mimeType,
+        })
+        .returning();
+
+      if (!resume) {
+        throw new InternalServerError('Failed to save resume metadata');
+      }
+
+      const [application] = await tx
+        .insert(jobApplications)
+        .values({
+          vacancyId: data.vacancyId,
+          candidateId,
+          state: 'PENDING',
+          coverLetter: data.coverLetter,
+          appliedAt: new Date(),
+        })
+        .returning();
+
+      if (!application) {
+        throw new InternalServerError('Failed to create job application');
+      }
+
+      await tx
+        .update(candidateResumes)
+        .set({ applicationId: application.id })
+        .where(eq(candidateResumes.id, resume.id));
+
+      return { application, resume };
+    });
+
+    return {
+      id: result.application.id,
+      state: result.application.state,
+      appliedAt: result.application.appliedAt ? result.application.appliedAt.toISOString() : '',
+      candidate: {
+        id: candidateId,
+        firstName: data.candidate.firstName,
+        lastName: data.candidate.lastName,
+        email: normalizedEmail,
+      },
+      vacancy: {
+        id: vacancy.id,
+        title: vacancy.title,
+      },
+    };
+  } catch (error) {
+    await deleteFile(storagePath);
+    throw error;
+  }
+}
+
 // --- Candidates ---
 
 export async function listCandidates(query: ListCandidatesQuery) {
@@ -268,10 +404,12 @@ export async function getCandidateById(id: string) {
 }
 
 export async function createCandidate(data: CreateCandidateRequest) {
+  const normalizedEmail = data.email.toLowerCase();
+
   const existing = await db
     .select()
     .from(candidates)
-    .where(or(eq(candidates.email, data.email), eq(candidates.nationalId, data.nationalId)));
+    .where(or(eq(candidates.email, normalizedEmail), eq(candidates.nationalId, data.nationalId)));
 
   if (existing.length > 0) {
     throw new ConflictError('Candidate with this email or national ID already exists');
@@ -283,7 +421,7 @@ export async function createCandidate(data: CreateCandidateRequest) {
       nationalId: data.nationalId,
       firstName: data.firstName,
       lastName: data.lastName,
-      email: data.email,
+      email: normalizedEmail,
       phone: data.phone,
       address: data.address,
     })
@@ -306,7 +444,7 @@ export async function updateCandidate(id: string, data: UpdateCandidateRequest) 
   if (data.nationalId !== undefined) updateData.nationalId = data.nationalId;
   if (data.firstName !== undefined) updateData.firstName = data.firstName;
   if (data.lastName !== undefined) updateData.lastName = data.lastName;
-  if (data.email !== undefined) updateData.email = data.email;
+  if (data.email !== undefined) updateData.email = data.email.toLowerCase();
   if (data.phone !== undefined) updateData.phone = data.phone;
   if (data.address !== undefined) updateData.address = data.address;
 
@@ -572,7 +710,13 @@ export async function getCandidateResumeById(id: string) {
   };
 }
 
-export async function createCandidateResume(data: CreateCandidateResumeRequest) {
+export async function uploadCandidateResume(
+  data: UploadCandidateResumeRequest,
+  fileBuffer: Buffer,
+  originalName: string,
+  fileSizeBytes: number,
+  mimeType: string
+) {
   const candidate = await db.query.candidates.findFirst({
     where: eq(candidates.id, data.candidateId),
   });
@@ -585,30 +729,48 @@ export async function createCandidateResume(data: CreateCandidateResumeRequest) 
     const application = await db.query.jobApplications.findFirst({
       where: and(eq(jobApplications.id, data.applicationId), isNull(jobApplications.deletedAt)),
     });
-
     if (!application) {
       throw new NotFoundError('Job application', data.applicationId);
     }
   }
 
+  const fileExtension = originalName.split('.').pop() ?? 'pdf';
+  const filename = `${crypto.randomUUID()}.${fileExtension}`;
+  const storagePath = `candidates/${data.candidateId}/${filename}`;
+
+  await uploadFile(storagePath, fileBuffer, mimeType);
+
+  const fileSizeMb = fileSizeBytes / (1024 * 1024);
   const [resume] = await db
     .insert(candidateResumes)
     .values({
       candidateId: data.candidateId,
       applicationId: data.applicationId,
-      filename: data.filename,
-      fileExtension: data.fileExtension,
-      fileSizeMb: data.fileSizeMb.toString(),
-      storagePath: `uploads/candidates/${data.candidateId}/${data.filename}`,
-      mimeType: data.mimeType,
+      filename: originalName,
+      fileExtension,
+      fileSizeMb: fileSizeMb.toFixed(2),
+      storagePath,
+      mimeType,
     })
     .returning();
 
   if (!resume) {
-    throw new InternalServerError('Failed to create candidate resume');
+    await deleteFile(storagePath);
+    throw new InternalServerError('Failed to save resume metadata');
   }
 
   return getCandidateResumeById(resume.id);
+}
+
+export async function downloadCandidateResume(id: string) {
+  const resume = await getCandidateResumeById(id);
+  const stream = await downloadFile(resume.storagePath);
+
+  if (!stream) {
+    throw new NotFoundError('Resume file', id);
+  }
+
+  return { stream, resume };
 }
 
 export async function removeCandidateResume(id: string) {
@@ -620,5 +782,6 @@ export async function removeCandidateResume(id: string) {
     throw new NotFoundError('Candidate resume', id);
   }
 
+  await deleteFile(resume.storagePath);
   await db.delete(candidateResumes).where(eq(candidateResumes.id, id));
 }

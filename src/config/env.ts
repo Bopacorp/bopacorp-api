@@ -12,6 +12,11 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   LOG_PRETTY: z.string().default('false'),
   npm_package_version: z.string().optional(),
+  S3_REGION: z.string().min(1),
+  SUPABASE_S3_ENDPOINT: z.string().min(1),
+  SUPABASE_S3_ACCESS_KEY_ID: z.string().min(1),
+  SUPABASE_S3_SECRET_ACCESS_KEY: z.string().min(1),
+  SUPABASE_STORAGE_BUCKET: z.string().default('resumes'),
 });
 
 export const env = envSchema.parse(process.env);

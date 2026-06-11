@@ -1,6 +1,7 @@
+import type { Readable } from 'node:stream';
 import type {
+  ApplyJobVacancyRequest,
   CreateCandidateRequest,
-  CreateCandidateResumeRequest,
   CreateJobApplicationRequest,
   CreateJobVacancyRequest,
   ListCandidateResumesQuery,
@@ -10,8 +11,9 @@ import type {
   UpdateCandidateRequest,
   UpdateJobApplicationRequest,
   UpdateJobVacancyRequest,
+  UploadCandidateResumeRequest,
 } from '@bopacorp/shared/employability';
-import { UnauthorizedError } from '@shared/errors/http-error.js';
+import { BadRequestError, UnauthorizedError } from '@shared/errors/http-error.js';
 import type { Request, Response } from 'express';
 import * as service from './employability.service.js';
 
@@ -52,6 +54,24 @@ export async function listPublishedVacancies(req: Request, res: Response) {
   const query = req.query as unknown as ListJobVacanciesQuery;
   const result = await service.listPublishedVacancies(query);
   res.json({ success: true, data: result.data, meta: result.meta });
+}
+
+// Public apply
+
+export async function applyJobVacancy(req: Request, res: Response) {
+  if (!req.file) {
+    throw new BadRequestError('No PDF file provided');
+  }
+
+  const data = await service.applyJobVacancy(
+    req.body as ApplyJobVacancyRequest,
+    req.file.buffer,
+    req.file.originalname,
+    req.file.size,
+    req.file.mimetype
+  );
+
+  res.status(201).json({ success: true, data });
 }
 
 // Candidates
@@ -130,9 +150,46 @@ export async function getCandidateResumeById(req: Request<{ id: string }>, res: 
   res.json({ success: true, data });
 }
 
-export async function createCandidateResume(req: Request, res: Response) {
-  const data = await service.createCandidateResume(req.body as CreateCandidateResumeRequest);
+// shoud this exist?
+// why would we upload a resume without applying to a vacancy?
+export async function uploadCandidateResume(req: Request, res: Response) {
+  if (!req.file) {
+    throw new BadRequestError('No PDF file provided');
+  }
+
+  const data = await service.uploadCandidateResume(
+    req.body as UploadCandidateResumeRequest,
+    req.file.buffer,
+    req.file.originalname,
+    req.file.size,
+    req.file.mimetype
+  );
+
   res.status(201).json({ success: true, data });
+}
+
+export async function downloadCandidateResume(req: Request<{ id: string }>, res: Response) {
+  const { stream, resume } = await service.downloadCandidateResume(req.params.id);
+
+  res.setHeader('Content-Type', resume.mimeType);
+
+  const safeFilename = resume.filename.replace(/["\r\n]/g, '');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+
+  const readable = stream as Readable;
+
+  readable.on('error', () => {
+    if (!res.headersSent) {
+      res.status(500).end();
+    }
+    readable.destroy();
+  });
+
+  res.on('error', () => {
+    readable.destroy();
+  });
+
+  readable.pipe(res);
 }
 
 export async function removeCandidateResume(req: Request<{ id: string }>, res: Response) {

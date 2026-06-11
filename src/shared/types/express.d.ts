@@ -1,3 +1,5 @@
+import type { File } from 'multer';
+
 declare global {
   namespace Express {
     interface Request {
@@ -7,6 +9,7 @@ declare global {
         roles: string[];
         permissions: string[];
       };
+      file?: File;
     }
   }
 }

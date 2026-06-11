@@ -19,26 +19,18 @@ import { authenticate } from '@shared/middleware/authenticate.js';
 import { errorHandler } from '@shared/middleware/error-handler.js';
 import cors from 'cors';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 
 const app = express();
 const PORT = env.PORT;
 
+app.set('trust proxy', 1);
+
 app.use(pinoHttp({ logger }));
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
 
 app.get('/health', (req, res) => {
   req.log.info('Health check requested');

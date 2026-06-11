@@ -1,6 +1,6 @@
 import {
+  ApplyJobVacancyRequestSchema,
   CreateCandidateRequestSchema,
-  CreateCandidateResumeRequestSchema,
   CreateJobApplicationRequestSchema,
   CreateJobVacancyRequestSchema,
   ListCandidateResumesQuerySchema,
@@ -10,24 +10,66 @@ import {
   UpdateCandidateRequestSchema,
   UpdateJobApplicationRequestSchema,
   UpdateJobVacancyRequestSchema,
+  UploadCandidateResumeRequestSchema,
 } from '@bopacorp/shared/employability';
 import { authenticate } from '@shared/middleware/authenticate.js';
 import { authorize } from '@shared/middleware/authorize.js';
+import { uploadSinglePdf } from '@shared/middleware/upload.js';
 import { validate } from '@shared/middleware/validate.js';
 import { IdParamSchema } from '@shared/schemas/params.js';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import * as controller from './employability.controller.js';
 
 export const employabilityRoutes = Router();
 
-// Published vacancies (public)
+const applyRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many applications from this IP' },
+  },
+});
+
+function parseMultipartJsonBody(fields: string[]) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    for (const field of fields) {
+      const value = req.body?.[field];
+      if (typeof value === 'string') {
+        try {
+          req.body[field] = JSON.parse(value);
+        } catch {
+          // Leave as string; validation will catch invalid JSON
+        }
+      }
+    }
+    next();
+  };
+}
+
+// Public endpoints
+
 employabilityRoutes.get(
   '/vacancies/published',
   validate({ query: ListJobVacanciesQuerySchema }),
   controller.listPublishedVacancies
 );
 
+employabilityRoutes.post(
+  '/apply',
+  applyRateLimit,
+  uploadSinglePdf,
+  parseMultipartJsonBody(['candidate']),
+  validate({ body: ApplyJobVacancyRequestSchema }),
+  controller.applyJobVacancy
+);
+
 // Vacancies (admin)
+
 employabilityRoutes.get(
   '/vacancies',
   authenticate,
@@ -69,6 +111,7 @@ employabilityRoutes.delete(
 );
 
 // Candidates (admin)
+
 employabilityRoutes.get(
   '/candidates',
   authenticate,
@@ -110,6 +153,7 @@ employabilityRoutes.delete(
 );
 
 // Job applications (admin)
+
 employabilityRoutes.get(
   '/job-applications',
   authenticate,
@@ -151,6 +195,7 @@ employabilityRoutes.delete(
 );
 
 // Candidate resumes (admin)
+
 employabilityRoutes.get(
   '/candidate-resumes',
   authenticate,
@@ -167,12 +212,21 @@ employabilityRoutes.get(
   controller.getCandidateResumeById
 );
 
+employabilityRoutes.get(
+  '/candidate-resumes/:id/download',
+  authenticate,
+  authorize('candidate_resumes.read'),
+  validate({ params: IdParamSchema }),
+  controller.downloadCandidateResume
+);
+
 employabilityRoutes.post(
   '/candidate-resumes',
   authenticate,
   authorize('candidate_resumes.create'),
-  validate({ body: CreateCandidateResumeRequestSchema }),
-  controller.createCandidateResume
+  uploadSinglePdf,
+  validate({ body: UploadCandidateResumeRequestSchema }),
+  controller.uploadCandidateResume
 );
 
 employabilityRoutes.delete(
