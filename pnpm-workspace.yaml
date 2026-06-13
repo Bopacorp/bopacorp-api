@@ -1,7 +1,0 @@
-allowBuilds:
-  bcrypt: true
-  esbuild: true
-minimumReleaseAgeExclude:
-  - '@bopacorp/shared@0.2.6'
-  - '@bopacorp/shared@0.2.7'
-  - '@bopacorp/shared@0.2.8'
