@@ -15,8 +15,8 @@ importers:
         specifier: ^3.1063.0
         version: 3.1063.0(@aws-sdk/client-s3@3.1063.0)
       '@bopacorp/shared':
-        specifier: 0.2.3
-        version: 0.2.3
+        specifier: ^0.2.9
+        version: 0.2.9
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -323,8 +323,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@bopacorp/shared@0.2.3':
-    resolution: {integrity: sha512-XQIvYSVwF3+CIQa6o3xlQBUdQI/5NCteOEwDfpRvWVn7kenpfcf7ekdy2M/sSyU30Cr87GTHOukeFkNLZ3CGBA==, tarball: https://npm.pkg.github.com/download/@bopacorp/shared/0.2.3/39488f4e08999c7e17fde3f17a4e99d634aee624}
+  '@bopacorp/shared@0.2.9':
+    resolution: {integrity: sha512-K754shpmUnc7gaztDNoqRLP3sO3JdMV9/wityF/veyuCnloUGpj5L85OYjbrq09h28dsSqny6qKXtW6xJhOL0g==, tarball: https://npm.pkg.github.com/download/@bopacorp/shared/0.2.9/4875d3b1765b789491b934179c6bb0320fcb2ed4}
 
   '@commitlint/cli@21.0.2':
     resolution: {integrity: sha512-YMmfLbqBg+ZRvvmPhc+cilSQFrh/AgzVgCT1U/OifmUZEwPbvCtA8rN//YNaF9d5eoZphxVMGYtmwA2QgQORgg==}
@@ -2989,7 +2989,7 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.16':
     optional: true
 
-  '@bopacorp/shared@0.2.3':
+  '@bopacorp/shared@0.2.9':
     dependencies:
       zod: 4.4.3
 
