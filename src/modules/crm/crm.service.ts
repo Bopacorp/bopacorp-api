@@ -404,7 +404,7 @@ export async function getBusinessClientById(id: string) {
   };
 }
 
-export async function createBusinessClient(data: CreateBusinessClientRequest) {
+export async function createBusinessClient(data: CreateBusinessClientRequest, userId: string) {
   const existing = await db
     .select()
     .from(businessClients)
@@ -414,20 +414,30 @@ export async function createBusinessClient(data: CreateBusinessClientRequest) {
     throw new ConflictError('Business client with this RUC already exists');
   }
 
-  if (data.advisorId) {
+  let advisorId = data.advisorId;
+  if (!advisorId) {
+    const currentEmployee = await db.query.employees.findFirst({
+      where: eq(employees.userId, userId),
+    });
+    if (currentEmployee) {
+      advisorId = userId;
+    }
+  }
+
+  if (advisorId) {
     const advisor = await db.query.employees.findFirst({
-      where: eq(employees.userId, data.advisorId),
+      where: eq(employees.userId, advisorId),
     });
 
     if (!advisor) {
-      throw new NotFoundError('Advisor', data.advisorId);
+      throw new NotFoundError('Advisor', advisorId);
     }
   }
 
   const [row] = await db
     .insert(businessClients)
     .values({
-      advisorId: data.advisorId,
+      advisorId,
       ruc: data.ruc,
       businessName: data.businessName,
       contactName: data.contactName,

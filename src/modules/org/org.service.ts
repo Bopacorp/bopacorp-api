@@ -348,6 +348,10 @@ export async function listEmployees(query: ListEmployeesQuery) {
     conditions.push(eq(employees.orgRoleId, query.orgRoleId));
   }
 
+  if (query.orgRoleCode) {
+    conditions.push(eq(orgRoles.code, query.orgRoleCode));
+  }
+
   if (query.departmentId) {
     conditions.push(eq(orgRoles.departmentId, query.departmentId));
   }

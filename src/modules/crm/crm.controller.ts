@@ -94,7 +94,13 @@ export async function getBusinessClientById(req: Request<{ id: string }>, res: R
 }
 
 export async function createBusinessClient(req: Request, res: Response) {
-  const data = await service.createBusinessClient(req.body as CreateBusinessClientRequest);
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
+  const data = await service.createBusinessClient(
+    req.body as CreateBusinessClientRequest,
+    req.user.id
+  );
   res.status(201).json({ success: true, data });
 }
 
