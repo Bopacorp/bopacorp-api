@@ -22,23 +22,48 @@ function required<T>(value: T | undefined | null, label: string): T {
 }
 
 async function seed() {
-  const supervisorRole = await upsertRole('Supervisor', 'supervisor', 'Supervisor de ventas B2B');
-  const advisorRole = await upsertRole('Advisor', 'advisor', 'Asesor comercial de campo');
+  const managerRole = await upsertRole('Manager', 'manager', 'Management and executive board');
+  const supervisorRole = await upsertRole('Supervisor', 'supervisor', 'Immediate sales supervisor');
+  const advisorRole = await upsertRole('Advisor', 'advisor', 'Field sales advisor');
+  const coordinatorRole = await upsertRole(
+    'Coordinator',
+    'coordinator',
+    'Documentation and operations coordinator'
+  );
+  await upsertRole('Web Admin', 'web-admin', 'Public website CMS administrator');
 
   const deptResults = await upsertDepartments([
-    { code: 'VENTAS_B2B', name: 'Ventas B2B' },
-    { code: 'OPERACIONES', name: 'Operaciones' },
+    { code: 'sales', name: 'Ventas B2B' },
+    { code: 'operations', name: 'Operaciones' },
+    { code: 'management', name: 'Gerencia' },
   ]);
   const deptSales = required(deptResults[0], 'deptSales');
   const deptOps = required(deptResults[1], 'deptOps');
+  const deptMgmt = required(deptResults[2], 'deptMgmt');
 
   const orgRoleResults = await upsertOrgRoles([
-    { code: 'SUPERVISOR_VENTAS', name: 'Supervisor de Ventas', departmentId: deptSales.id },
-    { code: 'ASESOR_COMERCIAL', name: 'Asesor Comercial', departmentId: deptSales.id },
-    { code: 'COORDINADOR_OPS', name: 'Coordinador de Operaciones', departmentId: deptOps.id },
+    { code: 'manager', name: 'Gerente General', departmentId: deptMgmt.id },
+    { code: 'supervisor', name: 'Supervisor de Ventas', departmentId: deptSales.id },
+    { code: 'advisor', name: 'Asesor Comercial', departmentId: deptSales.id },
+    { code: 'coordinator', name: 'Coordinador de Operaciones', departmentId: deptOps.id },
   ]);
-  const roleSupervisor = required(orgRoleResults[0], 'roleSupervisor');
-  const roleAdvisor = required(orgRoleResults[1], 'roleAdvisor');
+  const roleManager = required(orgRoleResults[0], 'roleManager');
+  const roleSupervisor = required(orgRoleResults[1], 'roleSupervisor');
+  const roleAdvisor = required(orgRoleResults[2], 'roleAdvisor');
+  const roleCoordinator = required(orgRoleResults[3], 'roleCoordinator');
+
+  const managerUsers = [
+    {
+      username: 'cpauta',
+      email: 'cpauta@bopacorp.com',
+      firstName: 'Christian',
+      lastName: 'Pauta',
+      secondLastName: 'Lopez',
+      nationalId: '0901234567',
+      phone: '0990123456',
+      territory: 'Guayaquil',
+    },
+  ];
 
   const supervisorUsers = [
     {
@@ -126,12 +151,45 @@ async function seed() {
     },
   ];
 
+  const coordinatorUsers = [
+    {
+      username: 'dsanchez',
+      email: 'dsanchez@bopacorp.com',
+      firstName: 'Diana',
+      lastName: 'Sanchez',
+      secondLastName: 'Ortega',
+      nationalId: '0911122334',
+      phone: '0991112233',
+      territory: 'Guayaquil',
+    },
+  ];
+
+  const webAdminUsers = [
+    {
+      username: 'webadmin',
+      email: 'webadmin@bopacorp.com',
+      firstName: 'Ana',
+      lastName: 'Torres',
+      secondLastName: 'Mera',
+      nationalId: '0922233445',
+      phone: '0992223344',
+    },
+  ];
+
+  const mgrIds = await createUsersWithProfiles(managerUsers, managerRole.id, roleManager.id);
   const supIds = await createUsersWithProfiles(
     supervisorUsers,
     supervisorRole.id,
     roleSupervisor.id
   );
   const advIds = await createUsersWithProfiles(advisorUsers, advisorRole.id, roleAdvisor.id);
+  const coordIds = await createUsersWithProfiles(
+    coordinatorUsers,
+    coordinatorRole.id,
+    roleCoordinator.id
+  );
+
+  await createWebAdminUsers(webAdminUsers);
 
   const sup0 = required(supIds[0], 'sup0');
   const sup1 = required(supIds[1], 'sup1');
@@ -141,6 +199,9 @@ async function seed() {
   const adv3 = required(advIds[3], 'adv3');
   const adv4 = required(advIds[4], 'adv4');
   const adv5 = required(advIds[5], 'adv5');
+
+  void mgrIds;
+  void coordIds;
 
   await db
     .insert(advisorSupervisors)
@@ -188,6 +249,11 @@ async function seed() {
     },
     { code: 'WON', name: 'Ganada', description: 'Venta cerrada exitosamente' },
     { code: 'LOST', name: 'Perdida', description: 'Oportunidad descartada' },
+    {
+      code: 'POST_SALE',
+      name: 'Post-venta',
+      description: 'Seguimiento y soporte despues del cierre',
+    },
   ]);
 
   const stateMap = new Map(states.map((s) => [s.code, s]));
@@ -401,10 +467,10 @@ async function seed() {
     {
       clientId: cl(8).id,
       advisorId: adv4,
-      stateId: getState('WON').id,
+      stateId: getState('POST_SALE').id,
       startDate: '2026-05-18',
       estimatedCloseDate: '2026-06-10',
-      observations: 'Cerrado: 18 lineas moviles + enlace dedicado',
+      observations: 'Cerrado: 18 lineas moviles + enlace dedicado, en seguimiento post-venta',
     },
     {
       clientId: cl(9).id,
@@ -611,6 +677,52 @@ async function createUsersWithProfiles(
   }
 
   return ids;
+}
+
+async function createWebAdminUsers(
+  userData: {
+    username: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    secondLastName: string;
+    nationalId: string;
+    phone: string;
+  }[]
+) {
+  const webAdminRole = await db.query.roles.findFirst({ where: eq(roles.slug, 'web-admin') });
+  const roleId = required(webAdminRole, 'role:web-admin').id;
+
+  for (const u of userData) {
+    const [inserted] = await db
+      .insert(users)
+      .values({ username: u.username, email: u.email, passwordHash: PASSWORD_HASH })
+      .onConflictDoNothing({ target: users.username })
+      .returning();
+
+    let userId: string;
+    if (inserted) {
+      userId = inserted.id;
+    } else {
+      const found = await db.query.users.findFirst({ where: eq(users.username, u.username) });
+      userId = required(found, `user:${u.username}`).id;
+    }
+
+    await db
+      .insert(profiles)
+      .values({
+        userId,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        secondLastName: u.secondLastName,
+        nationalId: u.nationalId,
+        phone: u.phone,
+        address: 'Guayaquil, Ecuador',
+      })
+      .onConflictDoNothing();
+
+    await db.insert(userRoles).values({ userId, roleId }).onConflictDoNothing();
+  }
 }
 
 async function upsertBusinessClients(
