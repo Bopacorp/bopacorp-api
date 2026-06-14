@@ -27,7 +27,19 @@ const PORT = env.PORT;
 
 app.set('trust proxy', 1);
 
-app.use(pinoHttp({ logger }));
+app.use(
+  pinoHttp({
+    logger,
+    serializers: {
+      req(req) {
+        return { method: req.method, url: req.url };
+      },
+      res(res) {
+        return { statusCode: res.statusCode };
+      },
+    },
+  })
+);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
