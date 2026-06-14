@@ -32,3 +32,5 @@ coverage/
 .opencode
 .claude
 .opencode/memory/
+
+.scripts
