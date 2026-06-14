@@ -18,7 +18,7 @@ import type {
   VerifyVisitRequest,
 } from '@bopacorp/shared/crm';
 import { users } from '@db/schema/auth.js';
-import { employees } from '@db/schema/core.js';
+import { employees, profiles } from '@db/schema/core.js';
 import {
   businessClients,
   negotiationStateHistory,
@@ -29,12 +29,44 @@ import {
 } from '@db/schema/crm.js';
 import { db } from '@lib/db.js';
 import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, gte, ilike, isNull, lte, or, type SQL, sql } from 'drizzle-orm';
+import type { AnyColumn } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, isNull, lte, or, type SQL, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
 function formatDateTime(d: Date | null): string {
   return d ? d.toISOString() : '';
+}
+
+function getOrderBy(column: AnyColumn, order: 'asc' | 'desc') {
+  return order === 'desc' ? desc(column) : asc(column);
+}
+
+function getClientSortColumn(sortBy?: string): AnyColumn {
+  const map: Record<string, AnyColumn> = {
+    businessName: businessClients.businessName,
+    contactName: businessClients.contactName,
+    ruc: businessClients.ruc,
+    createdAt: businessClients.createdAt,
+  };
+  return (sortBy && map[sortBy]) || businessClients.createdAt;
+}
+
+function getNegotiationSortColumn(sortBy?: string): AnyColumn {
+  const map: Record<string, AnyColumn> = {
+    startDate: negotiations.startDate,
+    estimatedCloseDate: negotiations.estimatedCloseDate,
+    createdAt: negotiations.createdAt,
+  };
+  return (sortBy && map[sortBy]) || negotiations.createdAt;
+}
+
+function getVisitSortColumn(sortBy?: string): AnyColumn {
+  const map: Record<string, AnyColumn> = {
+    visitDate: visits.visitDate,
+    createdAt: visits.createdAt,
+  };
+  return (sortBy && map[sortBy]) || visits.visitDate;
 }
 
 // ── Negotiation States ──
@@ -347,19 +379,36 @@ export async function listBusinessClients(query: ListBusinessClientsQuery) {
       isActive: businessClients.isActive,
       createdAt: businessClients.createdAt,
       updatedAt: businessClients.updatedAt,
-      advisor: { id: users.id, username: users.username },
+      advisorId: users.id,
+      advisorUsername: users.username,
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
     })
     .from(businessClients)
     .leftJoin(users, eq(businessClients.advisorId, users.id))
+    .leftJoin(profiles, eq(users.id, profiles.userId))
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(businessClients.createdAt);
+    .orderBy(getOrderBy(getClientSortColumn(query.sortBy), query.sortOrder));
 
   return {
     data: rows.map((row) => ({
-      ...row,
-      advisor: row.advisor ? row.advisor : null,
+      id: row.id,
+      ruc: row.ruc,
+      businessName: row.businessName,
+      contactName: row.contactName,
+      isActive: row.isActive,
+      advisor: row.advisorId
+        ? {
+            id: row.advisorId,
+            username: row.advisorUsername ?? '',
+            profile:
+              row.advisorFirstName && row.advisorLastName
+                ? { firstName: row.advisorFirstName, lastName: row.advisorLastName }
+                : null,
+          }
+        : null,
       createdAt: formatDateTime(row.createdAt),
       updatedAt: formatDateTime(row.updatedAt),
     })),
@@ -370,7 +419,7 @@ export async function listBusinessClients(query: ListBusinessClientsQuery) {
 export async function getBusinessClientById(id: string) {
   const row = await db.query.businessClients.findFirst({
     where: and(eq(businessClients.id, id), isNull(businessClients.deletedAt)),
-    with: { advisor: { with: { user: true } } },
+    with: { advisor: { with: { user: { with: { profile: true } } } } },
   });
 
   if (!row) {
@@ -379,6 +428,7 @@ export async function getBusinessClientById(id: string) {
 
   const advisor = row.advisor;
   const user = advisor?.user;
+  const profile = user?.profile;
 
   return {
     id: row.id,
@@ -396,7 +446,7 @@ export async function getBusinessClientById(id: string) {
           id: advisor.userId,
           username: user?.username ?? '',
           email: user?.email ?? '',
-          profile: null,
+          profile: profile ? { firstName: profile.firstName, lastName: profile.lastName } : null,
         }
       : null,
     createdAt: formatDateTime(row.createdAt),
@@ -552,7 +602,10 @@ export async function listNegotiations(query: ListNegotiationsQuery) {
       createdAt: negotiations.createdAt,
       updatedAt: negotiations.updatedAt,
       client: { id: businessClients.id, businessName: businessClients.businessName },
-      advisor: { id: users.id, username: users.username },
+      advisorId: users.id,
+      advisorUsername: users.username,
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
       state: {
         id: negotiationStates.id,
         code: negotiationStates.code,
@@ -562,17 +615,29 @@ export async function listNegotiations(query: ListNegotiationsQuery) {
     .from(negotiations)
     .innerJoin(businessClients, eq(negotiations.clientId, businessClients.id))
     .innerJoin(users, eq(negotiations.advisorId, users.id))
+    .leftJoin(profiles, eq(users.id, profiles.userId))
     .innerJoin(negotiationStates, eq(negotiations.stateId, negotiationStates.id))
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(negotiations.createdAt);
+    .orderBy(getOrderBy(getNegotiationSortColumn(query.sortBy), query.sortOrder));
 
   return {
     data: rows.map((row) => ({
-      ...row,
+      id: row.id,
       startDate: row.startDate,
       estimatedCloseDate: row.estimatedCloseDate,
+      isActive: row.isActive,
+      client: row.client,
+      advisor: {
+        id: row.advisorId,
+        username: row.advisorUsername,
+        profile:
+          row.advisorFirstName && row.advisorLastName
+            ? { firstName: row.advisorFirstName, lastName: row.advisorLastName }
+            : null,
+      },
+      state: row.state,
       createdAt: formatDateTime(row.createdAt),
       updatedAt: formatDateTime(row.updatedAt),
     })),
@@ -585,7 +650,7 @@ export async function getNegotiationById(id: string) {
     where: and(eq(negotiations.id, id), isNull(negotiations.deletedAt)),
     with: {
       client: true,
-      advisor: { with: { user: true } },
+      advisor: { with: { user: { with: { profile: true } } } },
       state: true,
     },
   });
@@ -596,6 +661,7 @@ export async function getNegotiationById(id: string) {
 
   const advisor = row.advisor;
   const user = advisor?.user;
+  const profile = user?.profile;
 
   return {
     id: row.id,
@@ -612,7 +678,7 @@ export async function getNegotiationById(id: string) {
       id: advisor.userId,
       username: user?.username ?? '',
       email: user?.email ?? '',
-      profile: null,
+      profile: profile ? { firstName: profile.firstName, lastName: profile.lastName } : null,
     },
     state: {
       id: row.state.id,
@@ -854,22 +920,37 @@ export async function listVisits(query: ListVisitsQuery) {
       createdAt: visits.createdAt,
       updatedAt: visits.updatedAt,
       client: { id: businessClients.id, businessName: businessClients.businessName },
-      advisor: { id: users.id, username: users.username },
+      advisorId: users.id,
+      advisorUsername: users.username,
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
       visitType: { id: visitTypes.id, name: visitTypes.name },
     })
     .from(visits)
     .innerJoin(businessClients, eq(visits.clientId, businessClients.id))
     .innerJoin(users, eq(visits.advisorId, users.id))
+    .leftJoin(profiles, eq(users.id, profiles.userId))
     .innerJoin(visitTypes, eq(visits.visitTypeId, visitTypes.id))
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(visits.visitDate);
+    .orderBy(getOrderBy(getVisitSortColumn(query.sortBy), query.sortOrder));
 
   return {
     data: rows.map((row) => ({
-      ...row,
+      id: row.id,
       visitDate: formatDateTime(row.visitDate),
+      isVerified: row.isVerified,
+      client: row.client,
+      advisor: {
+        id: row.advisorId,
+        username: row.advisorUsername,
+        profile:
+          row.advisorFirstName && row.advisorLastName
+            ? { firstName: row.advisorFirstName, lastName: row.advisorLastName }
+            : null,
+      },
+      visitType: row.visitType,
       createdAt: formatDateTime(row.createdAt),
       updatedAt: formatDateTime(row.updatedAt),
     })),
@@ -882,7 +963,7 @@ export async function getVisitById(id: string) {
     where: and(eq(visits.id, id), isNull(visits.deletedAt)),
     with: {
       client: true,
-      advisor: { with: { user: true } },
+      advisor: { with: { user: { with: { profile: true } } } },
       visitType: true,
       verifiedBy: true,
       negotiation: { with: { client: true } },
@@ -895,6 +976,7 @@ export async function getVisitById(id: string) {
 
   const advisor = row.advisor;
   const user = advisor?.user;
+  const profile = user?.profile;
 
   return {
     id: row.id,
@@ -924,7 +1006,7 @@ export async function getVisitById(id: string) {
       id: advisor.userId,
       username: user?.username ?? '',
       email: user?.email ?? '',
-      profile: null,
+      profile: profile ? { firstName: profile.firstName, lastName: profile.lastName } : null,
     },
     verifiedBy: row.verifiedBy
       ? { id: row.verifiedBy.id, username: row.verifiedBy.username }
