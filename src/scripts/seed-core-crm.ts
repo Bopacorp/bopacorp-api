@@ -72,7 +72,7 @@ async function seed() {
       firstName: 'Maria',
       lastName: 'Castillo',
       secondLastName: 'Velez',
-      nationalId: '0912345678',
+      nationalId: '0913456780',
       phone: '0991234567',
       territory: 'Guayaquil Norte',
     },
