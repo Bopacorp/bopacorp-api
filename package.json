@@ -16,6 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "db:migrate:prod": "node dist/db/migrate.js",
     "seed:cms:about": "tsx src/scripts/seed-cms-about.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
