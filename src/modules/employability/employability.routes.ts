@@ -35,6 +35,17 @@ const applyRateLimit = rateLimit({
   },
 });
 
+const publicReadRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later' },
+  },
+});
+
 function parseMultipartJsonBody(fields: string[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
     for (const field of fields) {
@@ -57,6 +68,13 @@ employabilityRoutes.get(
   '/vacancies/published',
   validate({ query: ListJobVacanciesQuerySchema }),
   controller.listPublishedVacancies
+);
+
+employabilityRoutes.get(
+  '/vacancies/:id/public',
+  publicReadRateLimit,
+  validate({ params: IdParamSchema }),
+  controller.getPublishedVacancyById
 );
 
 employabilityRoutes.post(

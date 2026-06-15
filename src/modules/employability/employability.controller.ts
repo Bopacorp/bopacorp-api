@@ -8,6 +8,7 @@ import type {
   ListCandidatesQuery,
   ListJobApplicationsQuery,
   ListJobVacanciesQuery,
+  PublicJobVacancyResponse,
   UpdateCandidateRequest,
   UpdateJobApplicationRequest,
   UpdateJobVacancyRequest,
@@ -54,6 +55,11 @@ export async function listPublishedVacancies(req: Request, res: Response) {
   const query = req.query as unknown as ListJobVacanciesQuery;
   const result = await service.listPublishedVacancies(query);
   res.json({ success: true, data: result.data, meta: result.meta });
+}
+
+export async function getPublishedVacancyById(req: Request<{ id: string }>, res: Response) {
+  const data: PublicJobVacancyResponse = await service.getPublishedVacancyById(req.params.id);
+  res.json({ success: true, data });
 }
 
 // Public apply

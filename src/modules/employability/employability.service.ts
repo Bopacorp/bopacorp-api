@@ -8,6 +8,7 @@ import type {
   ListCandidatesQuery,
   ListJobApplicationsQuery,
   ListJobVacanciesQuery,
+  PublicJobVacancyResponse,
   UpdateCandidateRequest,
   UpdateJobApplicationRequest,
   UpdateJobVacancyRequest,
@@ -200,6 +201,38 @@ export async function listPublishedVacancies(query: ListJobVacanciesQuery) {
       updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
     })),
     meta: { page: query.page, limit: query.limit, totalItems, totalPages },
+  };
+}
+
+export async function getPublishedVacancyById(id: string): Promise<PublicJobVacancyResponse> {
+  const now = new Date();
+  const vacancy = await db.query.jobVacancies.findFirst({
+    where: and(
+      eq(jobVacancies.id, id),
+      isNull(jobVacancies.deletedAt),
+      eq(jobVacancies.isPublished, true),
+      eq(jobVacancies.isActive, true),
+      or(isNull(jobVacancies.closingDate), gte(jobVacancies.closingDate, now))
+    ),
+    with: { creator: true },
+  });
+
+  if (!vacancy) {
+    throw new NotFoundError('Job vacancy', id);
+  }
+
+  const creator = vacancy.creator;
+
+  return {
+    id: vacancy.id,
+    title: vacancy.title,
+    description: vacancy.description,
+    requirements: vacancy.requirements,
+    publicationDate: vacancy.publicationDate ? vacancy.publicationDate.toISOString() : null,
+    closingDate: vacancy.closingDate ? vacancy.closingDate.toISOString() : null,
+    creator: creator ? { id: creator.id, username: creator.username } : { id: '', username: '' },
+    createdAt: vacancy.createdAt ? vacancy.createdAt.toISOString() : '',
+    updatedAt: vacancy.updatedAt ? vacancy.updatedAt.toISOString() : '',
   };
 }
 
