@@ -27,7 +27,21 @@ import {
   InternalServerError,
   NotFoundError,
 } from '@shared/errors/http-error.js';
-import { and, eq, ilike, isNull } from 'drizzle-orm';
+import { type AnyColumn, and, asc, desc, eq, ilike, isNull } from 'drizzle-orm';
+
+function getOrderBy(column: AnyColumn, order: 'asc' | 'desc') {
+  return order === 'desc' ? desc(column) : asc(column);
+}
+
+function getCatalogItemSortColumn(sortBy?: string): AnyColumn {
+  const map: Record<string, AnyColumn> = {
+    name: catalogItems.name,
+    price: catalogItems.price,
+    createdAt: catalogItems.createdAt,
+    updatedAt: catalogItems.updatedAt,
+  };
+  return (sortBy && map[sortBy]) || catalogItems.name;
+}
 
 export async function listCatalogItems(query: ListCatalogItemsQuery) {
   const conditions = [isNull(catalogItems.deletedAt)];
@@ -78,7 +92,7 @@ export async function listCatalogItems(query: ListCatalogItemsQuery) {
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(catalogItems.name);
+    .orderBy(getOrderBy(getCatalogItemSortColumn(query.sortBy), query.sortOrder));
 
   return {
     data: rows.map((row) => ({
