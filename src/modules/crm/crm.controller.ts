@@ -83,8 +83,9 @@ export async function removeVisitType(req: Request<{ id: string }>, res: Respons
 // ── Business Clients ──
 
 export async function listBusinessClients(req: Request, res: Response) {
+  if (!req.user) throw new UnauthorizedError('Authentication required');
   const query = req.query as unknown as ListBusinessClientsQuery;
-  const result = await service.listBusinessClients(query);
+  const result = await service.listBusinessClients(query, req.user);
   res.json({ success: true, data: result.data, meta: result.meta });
 }
 
@@ -120,8 +121,9 @@ export async function removeBusinessClient(req: Request<{ id: string }>, res: Re
 // ── Negotiations ──
 
 export async function listNegotiations(req: Request, res: Response) {
+  if (!req.user) throw new UnauthorizedError('Authentication required');
   const query = req.query as unknown as ListNegotiationsQuery;
-  const result = await service.listNegotiations(query);
+  const result = await service.listNegotiations(query, req.user);
   res.json({ success: true, data: result.data, meta: result.meta });
 }
 
@@ -168,8 +170,9 @@ export async function getNegotiationHistory(req: Request<{ id: string }>, res: R
 // ── Visits ──
 
 export async function listVisits(req: Request, res: Response) {
+  if (!req.user) throw new UnauthorizedError('Authentication required');
   const query = req.query as unknown as ListVisitsQuery;
-  const result = await service.listVisits(query);
+  const result = await service.listVisits(query, req.user);
   res.json({ success: true, data: result.data, meta: result.meta });
 }
 

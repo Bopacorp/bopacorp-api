@@ -342,7 +342,12 @@ export async function removeVisitType(id: string) {
 
 // ── Business Clients ──
 
-export async function listBusinessClients(query: ListBusinessClientsQuery) {
+export async function listBusinessClients(
+  query: ListBusinessClientsQuery,
+  user: NonNullable<Express.Request['user']>
+) {
+  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+
   const conditions = [];
   conditions.push(isNull(businessClients.deletedAt));
 
@@ -350,8 +355,8 @@ export async function listBusinessClients(query: ListBusinessClientsQuery) {
     conditions.push(eq(businessClients.isActive, query.isActive));
   }
 
-  if (query.advisorId) {
-    conditions.push(eq(businessClients.advisorId, query.advisorId));
+  if (advisorId) {
+    conditions.push(eq(businessClients.advisorId, advisorId));
   }
 
   if (query.search) {
@@ -564,7 +569,12 @@ export async function removeBusinessClient(id: string) {
 
 // ── Negotiations ──
 
-export async function listNegotiations(query: ListNegotiationsQuery) {
+export async function listNegotiations(
+  query: ListNegotiationsQuery,
+  user: NonNullable<Express.Request['user']>
+) {
+  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+
   const conditions = [];
   conditions.push(isNull(negotiations.deletedAt));
 
@@ -576,8 +586,8 @@ export async function listNegotiations(query: ListNegotiationsQuery) {
     conditions.push(eq(negotiations.clientId, query.clientId));
   }
 
-  if (query.advisorId) {
-    conditions.push(eq(negotiations.advisorId, query.advisorId));
+  if (advisorId) {
+    conditions.push(eq(negotiations.advisorId, advisorId));
   }
 
   if (query.stateId) {
@@ -873,7 +883,12 @@ export async function getNegotiationHistory(id: string) {
 
 // ── Visits ──
 
-export async function listVisits(query: ListVisitsQuery) {
+export async function listVisits(
+  query: ListVisitsQuery,
+  user: NonNullable<Express.Request['user']>
+) {
+  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+
   const conditions = [];
   conditions.push(isNull(visits.deletedAt));
 
@@ -885,8 +900,8 @@ export async function listVisits(query: ListVisitsQuery) {
     conditions.push(eq(visits.clientId, query.clientId));
   }
 
-  if (query.advisorId) {
-    conditions.push(eq(visits.advisorId, query.advisorId));
+  if (advisorId) {
+    conditions.push(eq(visits.advisorId, advisorId));
   }
 
   if (query.visitTypeId) {
