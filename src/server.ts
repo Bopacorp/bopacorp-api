@@ -13,6 +13,7 @@ import { notificationsRoutes } from '@modules/notifications/notifications.routes
 import { orgRoutes } from '@modules/org/org.routes.js';
 import { reportsRoutes } from '@modules/reports/reports.routes.js';
 import { rolesRoutes } from '@modules/roles/roles.routes.js';
+import { uploadsRoutes } from '@modules/uploads/uploads.routes.js';
 import { usersRoutes } from '@modules/users/users.routes.js';
 import { HttpError } from '@shared/errors/http-error.js';
 import { authenticate } from '@shared/middleware/authenticate.js';
@@ -66,6 +67,7 @@ app.use('/api/v1/cms', cmsRoutes);
 app.use('/api/v1/users', authenticate, usersRoutes);
 app.use('/api/v1/org', authenticate, orgRoutes);
 app.use('/api/v1/roles', authenticate, rolesRoutes);
+app.use('/api/v1/uploads', authenticate, uploadsRoutes);
 app.use('/api/v1/auth', authRoutes);
 
 app.use((req, _res) => {

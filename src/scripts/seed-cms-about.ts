@@ -1,15 +1,14 @@
 import 'dotenv/config';
 import type { CreateContentBlockRequest } from '@bopacorp/shared/catalog';
+import { ContentTypeCode } from '@bopacorp/shared/catalog';
 import { closeDb, db } from '@lib/db.js';
 import { logger } from '@lib/logger.js';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { contentBlocks, contentTypes } from '../db/schema/catalog.js';
 
-type ContentTypeIds = {
-  TEXT: string;
-};
+type ContentTypeIds = Record<ContentTypeCode.TEXT, string>;
 
-async function getContentTypeId(code: string): Promise<string> {
+async function getContentTypeId(code: ContentTypeCode): Promise<string> {
   const [row] = await db
     .select({ id: contentTypes.id })
     .from(contentTypes)
@@ -177,7 +176,7 @@ const buildBlocks = (typeIds: ContentTypeIds): CreateContentBlockRequest[] => [
 
 async function seed() {
   const typeIds: ContentTypeIds = {
-    TEXT: await getContentTypeId('TEXT'),
+    TEXT: await getContentTypeId(ContentTypeCode.TEXT),
   };
 
   const blocks = buildBlocks(typeIds);

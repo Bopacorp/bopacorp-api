@@ -26,6 +26,7 @@ import type {
   UpdateSegmentRequest,
   UpdateTierRequest,
 } from '@bopacorp/shared/catalog';
+import { ContentTypeCode } from '@bopacorp/shared/catalog';
 import {
   benefitTypes,
   categories,
@@ -38,9 +39,24 @@ import {
   tiers,
 } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
-import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
+import {
+  BadRequestError,
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+} from '@shared/errors/http-error.js';
 import { and, asc, desc, eq, ilike, isNull, or } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
+
+function isValidImageBody(body: string | null | undefined): boolean {
+  if (!body) return true;
+  try {
+    const url = new URL(body);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export async function listContentTypes() {
   return db.select().from(contentTypes).orderBy(contentTypes.code);
@@ -234,6 +250,12 @@ export async function getContentBlockById(id: string) {
 }
 
 export async function createContentBlock(input: CreateContentBlockRequest, userId: string) {
+  const contentType = await getContentTypeById(input.contentTypeId);
+
+  if (contentType.code === ContentTypeCode.IMAGE && input.body && !isValidImageBody(input.body)) {
+    throw new BadRequestError('IMAGE content blocks require a valid URL in body');
+  }
+
   const existing = await db
     .select()
     .from(contentBlocks)
@@ -267,7 +289,18 @@ export async function updateContentBlock(
   input: UpdateContentBlockRequest,
   userId: string
 ) {
-  await getContentBlockById(id);
+  const existing = await getContentBlockById(id);
+
+  const effectiveContentTypeId = input.contentTypeId ?? existing.contentTypeId;
+  const contentType = await getContentTypeById(effectiveContentTypeId);
+
+  if (
+    contentType.code === ContentTypeCode.IMAGE &&
+    input.body !== undefined &&
+    !isValidImageBody(input.body)
+  ) {
+    throw new BadRequestError('IMAGE content blocks require a valid URL in body');
+  }
 
   if (input.contentKey) {
     const existing = await db

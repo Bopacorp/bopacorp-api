@@ -23,7 +23,7 @@ import {
 import { db } from '@lib/db.js';
 import { deleteFile, downloadFile, uploadFile } from '@lib/storage.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, gte, ilike, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, isNull, or } from 'drizzle-orm';
 
 // --- Vacancies ---
 
@@ -460,6 +460,25 @@ export async function removeCandidate(id: string) {
   await db.delete(candidates).where(eq(candidates.id, id));
 }
 
+async function findResumeForApplication(applicationId: string, candidateId: string) {
+  const resume = await db.query.candidateResumes.findFirst({
+    where: and(
+      eq(candidateResumes.candidateId, candidateId),
+      or(eq(candidateResumes.applicationId, applicationId), isNull(candidateResumes.applicationId))
+    ),
+    orderBy: (t, { desc: descFn }) => descFn(t.uploadedAt),
+  });
+
+  if (!resume) return null;
+
+  return {
+    id: resume.id,
+    filename: resume.filename,
+    mimeType: resume.mimeType,
+    fileSizeMb: Number.parseFloat(resume.fileSizeMb),
+  };
+}
+
 // --- Job Applications ---
 
 export async function listJobApplications(query: ListJobApplicationsQuery) {
@@ -508,13 +527,48 @@ export async function listJobApplications(query: ListJobApplicationsQuery) {
     .offset((query.page - 1) * query.limit)
     .orderBy(jobApplications.createdAt);
 
-  return {
-    data: rows.map((row) => ({
+  const applicationIds = rows.map((row) => row.id);
+  const candidateIds = rows.map((row) => row.candidate.id);
+
+  const resumes = applicationIds.length
+    ? await db
+        .select()
+        .from(candidateResumes)
+        .where(
+          and(
+            or(
+              inArray(candidateResumes.applicationId, applicationIds),
+              and(
+                isNull(candidateResumes.applicationId),
+                inArray(candidateResumes.candidateId, candidateIds)
+              )
+            )
+          )
+        )
+        .orderBy(desc(candidateResumes.uploadedAt))
+    : [];
+
+  const data = rows.map((row) => {
+    const applicationResume = resumes.find((resume) => resume.applicationId === row.id);
+    const fallbackResume = resumes.find(
+      (resume) =>
+        !resume.applicationId &&
+        resume.candidateId === row.candidate.id &&
+        resume.id !== applicationResume?.id
+    );
+    const resume = applicationResume ?? fallbackResume ?? null;
+
+    return {
       ...row,
+      hasResume: !!resume,
       appliedAt: row.appliedAt ? row.appliedAt.toISOString() : null,
       createdAt: row.createdAt ? row.createdAt.toISOString() : '',
       updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
-    })),
+    };
+  });
+
+  return {
+    data,
     meta: { page: query.page, limit: query.limit, totalItems, totalPages },
   };
 }
@@ -532,6 +586,7 @@ export async function getJobApplicationById(id: string) {
   const vacancy = application.vacancy;
   const candidate = application.candidate;
   const reviewer = application.reviewer;
+  const resume = await findResumeForApplication(application.id, candidate?.id ?? '');
 
   return {
     id: application.id,
@@ -552,6 +607,7 @@ export async function getJobApplicationById(id: string) {
     reviewer: reviewer
       ? { id: reviewer.id, username: reviewer.username, email: reviewer.email }
       : null,
+    resume,
     createdAt: application.createdAt ? application.createdAt.toISOString() : '',
     updatedAt: application.updatedAt ? application.updatedAt.toISOString() : '',
   };
