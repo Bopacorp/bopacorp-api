@@ -22,6 +22,7 @@ export const negotiationStates = crmSchema.table('negotiation_states', {
   code: varchar({ length: 30 }).notNull().unique(),
   name: varchar({ length: 100 }).notNull(),
   description: varchar({ length: 255 }),
+  position: integer('position').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),

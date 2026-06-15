@@ -4,6 +4,7 @@ import {
   UpdateCatalogItemRequestSchema,
 } from '@bopacorp/shared/catalog';
 import { authorize } from '@shared/middleware/authorize.js';
+import { uploadSingleImage } from '@shared/middleware/upload.js';
 import { validate } from '@shared/middleware/validate.js';
 import { IdParamSchema } from '@shared/schemas/params.js';
 import { Router } from 'express';
@@ -44,4 +45,19 @@ catalogItemsRoutes.delete(
   authorize('catalog_items.delete'),
   validate({ params: IdParamSchema }),
   controller.remove
+);
+
+catalogItemsRoutes.post(
+  '/:id/image',
+  authorize('catalog_items.update'),
+  validate({ params: IdParamSchema }),
+  uploadSingleImage,
+  controller.uploadImage
+);
+
+catalogItemsRoutes.delete(
+  '/:id/image',
+  authorize('catalog_items.update'),
+  validate({ params: IdParamSchema }),
+  controller.deleteImage
 );

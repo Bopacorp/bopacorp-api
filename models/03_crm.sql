@@ -17,6 +17,7 @@ CREATE TABLE crm.negotiation_states (
     code        VARCHAR(30)  NOT NULL UNIQUE,
     name        VARCHAR(100) NOT NULL,
     description VARCHAR(255),
+    position    INTEGER      NOT NULL DEFAULT 0,
     is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP

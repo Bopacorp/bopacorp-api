@@ -3,6 +3,7 @@ import type {
   ListCatalogItemsQuery,
   UpdateCatalogItemRequest,
 } from '@bopacorp/shared/catalog';
+import { BadRequestError } from '@shared/errors/http-error.js';
 import type { Request, Response } from 'express';
 import * as service from './catalog-items.service.js';
 
@@ -29,5 +30,18 @@ export async function update(req: Request<{ id: string }>, res: Response) {
 
 export async function remove(req: Request<{ id: string }>, res: Response) {
   await service.removeCatalogItem(req.params.id);
+  res.json({ success: true, data: null });
+}
+
+export async function uploadImage(req: Request<{ id: string }>, res: Response) {
+  if (!req.file) {
+    throw new BadRequestError('No image file provided');
+  }
+  const data = await service.uploadItemImage(req.params.id, req.file);
+  res.json({ success: true, data });
+}
+
+export async function deleteImage(req: Request<{ id: string }>, res: Response) {
+  await service.deleteItemImage(req.params.id);
   res.json({ success: true, data: null });
 }

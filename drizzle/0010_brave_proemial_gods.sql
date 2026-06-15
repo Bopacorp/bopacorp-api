@@ -1,0 +1,1 @@
+ALTER TABLE "crm"."negotiation_states" ADD COLUMN "position" integer DEFAULT 0 NOT NULL;

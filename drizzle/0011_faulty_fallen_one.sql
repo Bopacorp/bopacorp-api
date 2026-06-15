@@ -1,0 +1,1 @@
+ALTER TABLE "catalog"."catalog_items" ADD COLUMN "image_path" varchar(500);

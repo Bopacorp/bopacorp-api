@@ -231,26 +231,31 @@ async function seed() {
       code: 'prospecting',
       name: 'Prospeccion',
       description: 'Identificacion del cliente potencial',
+      position: 1,
     },
     {
       code: 'initial_contact',
       name: 'Contacto Inicial',
       description: 'Primera visita o llamada al cliente',
+      position: 2,
     },
     {
       code: 'negotiation',
       name: 'Negociacion',
       description: 'Ajuste de terminos y condiciones',
+      position: 3,
     },
     {
       code: 'closing',
       name: 'Cierre',
       description: 'Venta cerrada o descartada',
+      position: 4,
     },
     {
       code: 'post_sale',
       name: 'Post-venta',
       description: 'Seguimiento y soporte despues del cierre',
+      position: 5,
     },
   ]);
 
@@ -751,7 +756,7 @@ async function upsertBusinessClients(
 }
 
 async function upsertNegotiationStates(
-  stateDefs: { code: string; name: string; description: string }[]
+  stateDefs: { code: string; name: string; description: string; position: number }[]
 ) {
   await db
     .insert(negotiationStates)

@@ -57,6 +57,7 @@ function getNegotiationSortColumn(sortBy?: string): AnyColumn {
     startDate: negotiations.startDate,
     estimatedCloseDate: negotiations.estimatedCloseDate,
     createdAt: negotiations.createdAt,
+    updatedAt: negotiations.updatedAt,
   };
   return (sortBy && map[sortBy]) || negotiations.createdAt;
 }
@@ -94,7 +95,7 @@ export async function listNegotiationStates(query: ListNegotiationStatesQuery) {
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(negotiationStates.createdAt);
+    .orderBy(asc(negotiationStates.position));
 
   return {
     data: rows.map((row) => ({
@@ -102,6 +103,7 @@ export async function listNegotiationStates(query: ListNegotiationStatesQuery) {
       code: row.code,
       name: row.name,
       description: row.description,
+      position: row.position,
       isActive: row.isActive,
       createdAt: formatDateTime(row.createdAt),
       updatedAt: formatDateTime(row.updatedAt),
@@ -124,6 +126,7 @@ export async function getNegotiationStateById(id: string) {
     code: row.code,
     name: row.name,
     description: row.description,
+    position: row.position,
     isActive: row.isActive,
     createdAt: formatDateTime(row.createdAt),
     updatedAt: formatDateTime(row.updatedAt),
@@ -595,12 +598,22 @@ export async function listNegotiations(
   }
 
   if (query.search) {
-    conditions.push(ilike(negotiations.observations, `%${query.search}%`));
+    conditions.push(
+      or(
+        ilike(negotiations.observations, `%${query.search}%`),
+        ilike(businessClients.businessName, `%${query.search}%`)
+      )
+    );
   }
 
   const where = and(...conditions) ?? sql`true`;
 
-  const totalItems = await db.$count(negotiations, where as SQL<unknown>);
+  const [countRow] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(negotiations)
+    .innerJoin(businessClients, eq(negotiations.clientId, businessClients.id))
+    .where(where);
+  const totalItems = countRow?.count ?? 0;
   const totalPages = Math.ceil(totalItems / query.limit);
 
   const rows = await db

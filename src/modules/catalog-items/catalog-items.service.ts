@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type {
   CreateCatalogItemRequest,
   ListCatalogItemsQuery,
@@ -19,7 +20,13 @@ import {
   voiceDetails,
 } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
-import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
+import { deleteFile, uploadFile } from '@lib/storage.js';
+import {
+  BadRequestError,
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+} from '@shared/errors/http-error.js';
 import { and, eq, ilike, isNull } from 'drizzle-orm';
 
 export async function listCatalogItems(query: ListCatalogItemsQuery) {
@@ -55,6 +62,7 @@ export async function listCatalogItems(query: ListCatalogItemsQuery) {
       id: catalogItems.id,
       name: catalogItems.name,
       price: catalogItems.price,
+      imagePath: catalogItems.imagePath,
       isActive: catalogItems.isActive,
       isPublished: catalogItems.isPublished,
       category: { id: categories.id, name: categories.name },
@@ -117,6 +125,7 @@ export async function getCatalogItemById(id: string) {
     description: item.description,
     price: Number.parseFloat(item.price),
     activationCode: item.activationCode,
+    imagePath: item.imagePath,
     isActive: item.isActive,
     isPublished: item.isPublished,
     permanenceMonths: item.permanenceMonths,
@@ -493,4 +502,66 @@ export async function removeCatalogItem(id: string) {
   await getCatalogItemById(id);
 
   await db.update(catalogItems).set({ deletedAt: new Date() }).where(eq(catalogItems.id, id));
+}
+
+const MIME_EXTENSIONS: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+};
+
+export async function uploadItemImage(
+  id: string,
+  file: { buffer: Buffer; mimetype: string; originalname: string }
+) {
+  const item = await db
+    .select({ id: catalogItems.id, imagePath: catalogItems.imagePath })
+    .from(catalogItems)
+    .where(and(eq(catalogItems.id, id), isNull(catalogItems.deletedAt)));
+
+  if (item.length === 0) {
+    throw new NotFoundError('Catalog item', id);
+  }
+
+  const ext = MIME_EXTENSIONS[file.mimetype];
+  if (!ext) {
+    throw new BadRequestError('Unsupported image format');
+  }
+
+  const oldPath = item[0]?.imagePath;
+  const storagePath = `catalog/${id}/${crypto.randomUUID()}${ext}`;
+
+  await uploadFile(storagePath, file.buffer, file.mimetype);
+
+  if (oldPath) {
+    await deleteFile(oldPath);
+  }
+
+  await db
+    .update(catalogItems)
+    .set({ imagePath: storagePath, updatedAt: new Date() })
+    .where(eq(catalogItems.id, id));
+
+  return { imagePath: storagePath };
+}
+
+export async function deleteItemImage(id: string) {
+  const item = await db
+    .select({ id: catalogItems.id, imagePath: catalogItems.imagePath })
+    .from(catalogItems)
+    .where(and(eq(catalogItems.id, id), isNull(catalogItems.deletedAt)));
+
+  if (item.length === 0) {
+    throw new NotFoundError('Catalog item', id);
+  }
+
+  const imagePath = item[0]?.imagePath;
+  if (imagePath) {
+    await deleteFile(imagePath);
+  }
+
+  await db
+    .update(catalogItems)
+    .set({ imagePath: null, updatedAt: new Date() })
+    .where(eq(catalogItems.id, id));
 }

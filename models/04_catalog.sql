@@ -130,6 +130,7 @@ CREATE TABLE catalog.catalog_items (
     is_active         BOOLEAN       NOT NULL DEFAULT TRUE,
     is_published      BOOLEAN       NOT NULL DEFAULT FALSE,
     permanence_months INTEGER       NOT NULL DEFAULT 0 CHECK (permanence_months >= 0),
+    image_path        VARCHAR(500),
     created_at        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
     deleted_at        TIMESTAMPTZ

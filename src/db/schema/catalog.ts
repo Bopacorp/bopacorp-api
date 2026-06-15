@@ -135,6 +135,7 @@ export const catalogItems = catalogSchema.table(
     isActive: boolean('is_active').notNull().default(true),
     isPublished: boolean('is_published').notNull().default(false),
     permanenceMonths: integer('permanence_months').notNull().default(0),
+    imagePath: varchar('image_path', { length: 500 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
