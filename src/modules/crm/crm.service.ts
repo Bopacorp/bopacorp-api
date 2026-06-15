@@ -939,7 +939,7 @@ export async function listVisits(
       advisorUsername: users.username,
       advisorFirstName: profiles.firstName,
       advisorLastName: profiles.lastName,
-      visitType: { id: visitTypes.id, name: visitTypes.name },
+      visitType: { id: visitTypes.id, code: visitTypes.code, name: visitTypes.name },
     })
     .from(visits)
     .innerJoin(businessClients, eq(visits.clientId, businessClients.id))

@@ -284,15 +284,7 @@ async function seed() {
     },
   ];
 
-  const stateKeys = [
-    'PROSPECTING',
-    'INITIAL_CONTACT',
-    'PROPOSAL',
-    'NEGOTIATION',
-    'WON',
-    'LOST',
-    'POST_SALE',
-  ];
+  const stateKeys = ['prospecting', 'initial_contact', 'negotiation', 'closing', 'post_sale'];
   const startDates = [
     '2026-04-01',
     '2026-04-05',
@@ -353,7 +345,7 @@ async function seed() {
 
     const startDate = startDates[i % startDates.length];
     if (!startDate) continue;
-    const hasClose = !['PROSPECTING', 'INITIAL_CONTACT'].includes(stateCode);
+    const hasClose = !['prospecting', 'initial_contact'].includes(stateCode);
 
     const [neg] = await db
       .insert(negotiations)
