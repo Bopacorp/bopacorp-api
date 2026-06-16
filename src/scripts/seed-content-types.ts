@@ -1,30 +1,31 @@
 import 'dotenv/config';
+import { ContentTypeCode } from '@bopacorp/shared/catalog';
 import { contentTypes } from '@db/schema/catalog.js';
 import { closeDb, db } from '@lib/db.js';
 
 const SEED_TYPES = [
   {
-    code: 'TEXT',
+    code: ContentTypeCode.TEXT,
     name: 'Texto plano',
     description: 'Bloque de contenido de texto sin formato HTML',
   },
   {
-    code: 'HTML',
+    code: ContentTypeCode.HTML,
     name: 'HTML',
     description: 'Bloque de contenido con formato HTML libre',
   },
   {
-    code: 'IMAGE',
+    code: ContentTypeCode.IMAGE,
     name: 'Imagen',
     description: 'Bloque de contenido de tipo imagen',
   },
   {
-    code: 'BANNER',
+    code: ContentTypeCode.BANNER,
     name: 'Banner',
     description: 'Bloque de contenido promocional tipo banner',
   },
   {
-    code: 'VIDEO',
+    code: ContentTypeCode.VIDEO,
     name: 'Video',
     description: 'Bloque de contenido de tipo video',
   },
