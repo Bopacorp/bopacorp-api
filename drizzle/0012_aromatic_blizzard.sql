@@ -1,0 +1,1 @@
+ALTER TABLE "documents"."negotiation_documents" ADD COLUMN "encryption_metadata" jsonb;

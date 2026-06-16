@@ -99,3 +99,11 @@ export async function listDocumentHistory(req: Request<{ id: string }>, res: Res
   const result = await service.listDocumentHistory({ ...query, documentId: req.params.id });
   res.json({ success: true, data: result.data, meta: result.meta });
 }
+
+export async function downloadDocument(req: Request<{ id: string }>, res: Response) {
+  const { buffer, filename, mimeType } = await service.downloadDocument(req.params.id);
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Type', mimeType);
+  res.setHeader('Content-Length', buffer.length.toString());
+  res.send(buffer);
+}

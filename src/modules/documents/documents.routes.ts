@@ -118,3 +118,11 @@ documentsRoutes.get(
   validate({ params: IdParamSchema, query: ListDocumentStateHistoryQuerySchema }),
   controller.listDocumentHistory
 );
+
+documentsRoutes.get(
+  '/:id/download',
+  authenticate,
+  authorize('negotiation_documents.read'),
+  validate({ params: IdParamSchema }),
+  controller.downloadDocument
+);

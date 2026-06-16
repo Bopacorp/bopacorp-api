@@ -14,13 +14,13 @@ const s3Client = new S3Client({
   forcePathStyle: true,
 });
 
-const bucket = env.SUPABASE_STORAGE_BUCKET;
+const defaultBucket = env.SUPABASE_STORAGE_BUCKET;
 
-export async function uploadFile(path: string, body: Buffer, contentType: string) {
+export async function uploadFile(path: string, body: Buffer, contentType: string, bucket?: string) {
   const upload = new Upload({
     client: s3Client,
     params: {
-      Bucket: bucket,
+      Bucket: bucket ?? defaultBucket,
       Key: path,
       Body: body,
       ContentType: contentType,
@@ -29,11 +29,11 @@ export async function uploadFile(path: string, body: Buffer, contentType: string
   return upload.done();
 }
 
-export async function downloadFile(path: string) {
+export async function downloadFile(path: string, bucket?: string) {
   try {
     const response = await s3Client.send(
       new GetObjectCommand({
-        Bucket: bucket,
+        Bucket: bucket ?? defaultBucket,
         Key: path,
       })
     );
@@ -46,11 +46,11 @@ export async function downloadFile(path: string) {
   }
 }
 
-export async function deleteFile(path: string) {
+export async function deleteFile(path: string, bucket?: string) {
   try {
     await s3Client.send(
       new DeleteObjectCommand({
-        Bucket: bucket,
+        Bucket: bucket ?? defaultBucket,
         Key: path,
       })
     );

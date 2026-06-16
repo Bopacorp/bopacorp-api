@@ -1,9 +1,11 @@
+import type { EncryptionMetadata } from '@lib/encryption.js';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
   decimal,
   index,
+  jsonb,
   pgEnum,
   pgSchema,
   text,
@@ -57,6 +59,7 @@ export const negotiationDocuments = documentsSchema.table(
     mimeType: varchar('mime_type', { length: 100 }).notNull(),
     reviewDate: timestamp('review_date', { withTimezone: true }),
     coordinatorMessage: text('coordinator_message'),
+    encryptionMetadata: jsonb('encryption_metadata').$type<EncryptionMetadata>(),
     uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),

@@ -6,6 +6,7 @@ import { catalogItemsRoutes } from '@modules/catalog-items/catalog-items.routes.
 import { cmsRoutes } from '@modules/cms/cms.routes.js';
 import { contactRequestsRoutes } from '@modules/contact-requests/contact-requests.routes.js';
 import { crmRoutes } from '@modules/crm/crm.routes.js';
+import { documentUploadsRoutes } from '@modules/document-uploads/document-uploads.routes.js';
 import { documentsRoutes } from '@modules/documents/documents.routes.js';
 import { employabilityRoutes } from '@modules/employability/employability.routes.js';
 import { matricesRoutes } from '@modules/matrices/matrices.routes.js';
@@ -59,6 +60,7 @@ app.use('/api/v1/catalog-items', authenticate, catalogItemsRoutes);
 app.use('/api/v1/contact-requests', contactRequestsRoutes);
 app.use('/api/v1/crm', authenticate, crmRoutes);
 app.use('/api/v1/documents', authenticate, documentsRoutes);
+app.use('/api/v1/document-uploads', authenticate, documentUploadsRoutes);
 app.use('/api/v1/notifications', authenticate, notificationsRoutes);
 app.use('/api/v1/reports', authenticate, reportsRoutes);
 app.use('/api/v1/matrices', authenticate, matricesRoutes);

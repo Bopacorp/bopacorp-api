@@ -8,10 +8,13 @@ import type {
   UpdateDocumentTypeRequest,
   UpdateNegotiationDocumentRequest,
 } from '@bopacorp/shared/documents';
+import { env } from '@config/env.js';
 import { users } from '@db/schema/auth.js';
 import { negotiations } from '@db/schema/crm.js';
 import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/schema/documents.js';
 import { db } from '@lib/db.js';
+import { decryptBuffer } from '@lib/encryption.js';
+import { downloadFile } from '@lib/storage.js';
 import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
 import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
 
@@ -351,6 +354,7 @@ export async function createDocument(userId: string, data: CreateNegotiationDocu
       fileSizeMb: data.fileSizeMb.toString(),
       storagePath: data.storagePath,
       mimeType: data.mimeType,
+      encryptionMetadata: data.encryptionMetadata,
     })
     .returning();
 
@@ -443,6 +447,34 @@ export async function changeDocumentState(
   });
 
   return getDocumentById(id);
+}
+
+export async function downloadDocument(id: string) {
+  const row = await db.query.negotiationDocuments.findFirst({
+    where: and(eq(negotiationDocuments.id, id), isNull(negotiationDocuments.deletedAt)),
+  });
+
+  if (!row) {
+    throw new NotFoundError('Negotiation document', id);
+  }
+
+  if (!row.encryptionMetadata) {
+    throw new ConflictError('Document is not encrypted or encryption metadata is missing');
+  }
+
+  const encryptedBody = await downloadFile(row.storagePath, env.DOCUMENTS_STORAGE_BUCKET);
+  if (!encryptedBody) {
+    throw new NotFoundError('Document file in storage', row.storagePath);
+  }
+
+  const encryptedBuffer = Buffer.from(await encryptedBody.transformToByteArray());
+  const buffer = decryptBuffer(encryptedBuffer, row.encryptionMetadata);
+
+  return {
+    buffer,
+    filename: row.filename,
+    mimeType: row.mimeType,
+  };
 }
 
 // ── Document State History ──

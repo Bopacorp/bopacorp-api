@@ -17,6 +17,8 @@ const envSchema = z.object({
   SUPABASE_S3_ACCESS_KEY_ID: z.string().min(1),
   SUPABASE_S3_SECRET_ACCESS_KEY: z.string().min(1),
   SUPABASE_STORAGE_BUCKET: z.string().default('resumes'),
+  DOCUMENTS_STORAGE_BUCKET: z.string().default('documents'),
+  DOCUMENTS_ENCRYPTION_KEY: z.string().min(1, 'DOCUMENTS_ENCRYPTION_KEY is required'),
   R2_ACCOUNT_ID: z.string().min(1),
   R2_ACCESS_KEY_ID: z.string().min(1),
   R2_SECRET_ACCESS_KEY: z.string().min(1),
