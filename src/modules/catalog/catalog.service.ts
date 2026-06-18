@@ -203,7 +203,8 @@ export async function listContentBlocks(query: ListContentBlocksQuery) {
   if (query.search) {
     const cond = or(
       ilike(contentBlocks.contentKey, `%${query.search}%`),
-      ilike(contentBlocks.title, `%${query.search}%`)
+      ilike(contentBlocks.title, `%${query.search}%`),
+      ilike(contentBlocks.body, `%${query.search}%`)
     );
     if (cond) conditions.push(cond);
   }
