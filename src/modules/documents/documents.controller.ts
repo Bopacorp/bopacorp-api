@@ -46,13 +46,19 @@ export async function removeDocumentType(req: Request<{ id: string }>, res: Resp
 // ── Negotiation Documents ──
 
 export async function listDocuments(req: Request, res: Response) {
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
   const query = req.query as unknown as ListNegotiationDocumentsQuery;
-  const result = await service.listDocuments(query);
+  const result = await service.listDocuments(query, req.user);
   res.json({ success: true, data: result.data, meta: result.meta });
 }
 
 export async function getDocumentById(req: Request<{ id: string }>, res: Response) {
-  const data = await service.getDocumentById(req.params.id);
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
+  const data = await service.getDocumentById(req.params.id, req.user);
   res.json({ success: true, data });
 }
 
@@ -101,7 +107,10 @@ export async function listDocumentHistory(req: Request<{ id: string }>, res: Res
 }
 
 export async function downloadDocument(req: Request<{ id: string }>, res: Response) {
-  const { buffer, filename, mimeType } = await service.downloadDocument(req.params.id);
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
+  const { buffer, filename, mimeType } = await service.downloadDocument(req.params.id, req.user);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Content-Length', buffer.length.toString());
