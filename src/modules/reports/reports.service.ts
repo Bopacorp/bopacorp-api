@@ -387,7 +387,7 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
         .select({ count: sql<number>`count(distinct ${visits.clientId})` })
         .from(visits)
         .where(and(eq(visits.advisorId, userId), isNull(visits.deletedAt), ...visitDateConditions));
-      const clientsVisited = visitedClientsResult[0]?.count ?? 0;
+      const clientsVisited = Number(visitedClientsResult[0]?.count ?? 0);
 
       const billingResult = await db
         .select({

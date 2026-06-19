@@ -88,7 +88,6 @@ reportsRoutes.post(
 reportsRoutes.get(
   '/advisor-metrics',
   authenticate,
-  authorize('reports.read'),
   validate({ query: ListAdvisorMetricsQuerySchema }),
   controller.listAdvisorMetrics
 );
