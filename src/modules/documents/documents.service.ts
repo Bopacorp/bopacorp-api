@@ -15,7 +15,7 @@ import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/s
 import { db } from '@lib/db.js';
 import { decryptBuffer } from '@lib/encryption.js';
 import { downloadFile } from '@lib/storage.js';
-import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
+import { ConflictError, ForbiddenError, NotFoundError } from '@shared/errors/http-error.js';
 import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
 
 // ── Helpers ──
@@ -168,7 +168,12 @@ export async function removeDocumentType(id: string) {
 
 // ── Negotiation Documents ──
 
-export async function listDocuments(query: ListNegotiationDocumentsQuery) {
+export async function listDocuments(
+  query: ListNegotiationDocumentsQuery,
+  user: NonNullable<Express.Request['user']>
+) {
+  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+
   const conditions = [];
   conditions.push(isNull(negotiationDocuments.deletedAt));
 
@@ -188,13 +193,22 @@ export async function listDocuments(query: ListNegotiationDocumentsQuery) {
     conditions.push(eq(negotiationDocuments.uploadedBy, query.uploadedBy));
   }
 
+  if (advisorId) {
+    conditions.push(eq(negotiations.advisorId, advisorId));
+  }
+
   if (query.search) {
     conditions.push(ilike(negotiationDocuments.filename, `%${query.search}%`));
   }
 
   const where = and(...conditions) ?? sql`true`;
 
-  const totalItems = await db.$count(negotiationDocuments, where as SQL<unknown>);
+  const [countRow] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(negotiationDocuments)
+    .innerJoin(negotiations, eq(negotiationDocuments.negotiationId, negotiations.id))
+    .where(where);
+  const totalItems = countRow?.count ?? 0;
   const totalPages = Math.ceil(totalItems / query.limit);
 
   const rows = await db
@@ -212,6 +226,7 @@ export async function listDocuments(query: ListNegotiationDocumentsQuery) {
       uploadedBy: negotiationDocuments.uploadedBy,
     })
     .from(negotiationDocuments)
+    .innerJoin(negotiations, eq(negotiationDocuments.negotiationId, negotiations.id))
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
@@ -266,7 +281,7 @@ export async function listDocuments(query: ListNegotiationDocumentsQuery) {
   };
 }
 
-export async function getDocumentById(id: string) {
+export async function getDocumentById(id: string, user?: NonNullable<Express.Request['user']>) {
   const row = await db.query.negotiationDocuments.findFirst({
     where: and(eq(negotiationDocuments.id, id), isNull(negotiationDocuments.deletedAt)),
     with: {
@@ -279,6 +294,10 @@ export async function getDocumentById(id: string) {
 
   if (!row) {
     throw new NotFoundError('Negotiation document', id);
+  }
+
+  if (user && user.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
+    throw new ForbiddenError('You can only access documents from your own negotiations');
   }
 
   const uploader = row.uploadedBy;
@@ -449,13 +468,18 @@ export async function changeDocumentState(
   return getDocumentById(id);
 }
 
-export async function downloadDocument(id: string) {
+export async function downloadDocument(id: string, user?: NonNullable<Express.Request['user']>) {
   const row = await db.query.negotiationDocuments.findFirst({
     where: and(eq(negotiationDocuments.id, id), isNull(negotiationDocuments.deletedAt)),
+    with: { negotiation: true },
   });
 
   if (!row) {
     throw new NotFoundError('Negotiation document', id);
+  }
+
+  if (user && user.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
+    throw new ForbiddenError('You can only access documents from your own negotiations');
   }
 
   if (!row.encryptionMetadata) {
