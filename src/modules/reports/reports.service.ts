@@ -1,16 +1,18 @@
 import type {
   CreateReportExportRequest,
   CreateSalesObjectiveRequest,
+  ListAdvisorMetricsQuery,
   ListReportExportsQuery,
   ListSalesObjectivesQuery,
   UpdateSalesObjectiveRequest,
 } from '@bopacorp/shared/reports';
-import { users } from '@db/schema/auth.js';
+import { roles, userRoles, users } from '@db/schema/auth.js';
 import { employees } from '@db/schema/core.js';
+import { businessClients, negotiationStates, negotiations, visits } from '@db/schema/crm.js';
 import { reportExports, salesObjectives } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -292,4 +294,134 @@ export async function createExport(userId: string, data: CreateReportExportReque
   }
 
   return getExportById(row.id);
+}
+
+// ── Advisor Metrics ──
+
+const ADVISOR_STATE_CODES = ['initial_contact', 'negotiation', 'closing', 'post_sale'] as const;
+
+type AdvisorStateCode = (typeof ADVISOR_STATE_CODES)[number];
+
+function buildDateRangeConditions(
+  query: ListAdvisorMetricsQuery,
+  dateColumn: typeof negotiations.createdAt | typeof visits.visitDate
+) {
+  const conditions = [];
+
+  if (query.dateFrom) {
+    conditions.push(gte(dateColumn, new Date(query.dateFrom)));
+  }
+
+  if (query.dateTo) {
+    const endOfDay = new Date(query.dateTo);
+    endOfDay.setHours(23, 59, 59, 999);
+    conditions.push(lte(dateColumn, endOfDay));
+  }
+
+  return conditions;
+}
+
+export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
+  const advisorRole = await db.query.roles.findFirst({
+    where: eq(roles.slug, 'advisor'),
+  });
+
+  if (!advisorRole) {
+    return { data: [] };
+  }
+
+  const advisorRows = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .where(eq(userRoles.roleId, advisorRole.id));
+
+  const stateRows = await db
+    .select()
+    .from(negotiationStates)
+    .where(sql`${negotiationStates.code} IN (${ADVISOR_STATE_CODES.join(',')})`);
+
+  const stateIds = Object.fromEntries(
+    stateRows.map((state) => [state.code as AdvisorStateCode, state.id])
+  ) as Record<AdvisorStateCode, string>;
+
+  const metrics = await Promise.all(
+    advisorRows.map(async ({ userId }) => {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+        with: { profile: true },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      const negotiationDateConditions = buildDateRangeConditions(query, negotiations.createdAt);
+      const negotiationBaseWhere = and(
+        eq(negotiations.advisorId, userId),
+        isNull(negotiations.deletedAt),
+        ...negotiationDateConditions
+      );
+
+      const [clientsContacted, clientsInNegotiation, clientsClosed, clientsPostSale] =
+        await Promise.all([
+          db.$count(
+            negotiations,
+            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.initial_contact))
+          ),
+          db.$count(
+            negotiations,
+            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.negotiation))
+          ),
+          db.$count(
+            negotiations,
+            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.closing))
+          ),
+          db.$count(
+            negotiations,
+            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.post_sale))
+          ),
+        ]);
+
+      const visitDateConditions = buildDateRangeConditions(query, visits.visitDate);
+      const visitedClientsResult = await db
+        .select({ count: sql<number>`count(distinct ${visits.clientId})` })
+        .from(visits)
+        .where(and(eq(visits.advisorId, userId), isNull(visits.deletedAt), ...visitDateConditions));
+      const clientsVisited = Number(visitedClientsResult[0]?.count ?? 0);
+
+      const billingResult = await db
+        .select({
+          totalBilled: sql<number>`coalesce(sum(${businessClients.currentMonthlyBilling}), 0)`,
+          totalServices: sql<number>`coalesce(sum(${businessClients.activeServicesCount}), 0)`,
+        })
+        .from(businessClients)
+        .where(and(eq(businessClients.advisorId, userId), isNull(businessClients.deletedAt)));
+
+      const totalBilledAmount = Number(billingResult[0]?.totalBilled ?? 0);
+      const totalServices = Number(billingResult[0]?.totalServices ?? 0);
+      const averageBillingPerService = totalServices > 0 ? totalBilledAmount / totalServices : 0;
+
+      return {
+        advisor: {
+          id: user.id,
+          username: user.username,
+          profile: user.profile
+            ? {
+                firstName: user.profile.firstName,
+                lastName: user.profile.lastName,
+              }
+            : null,
+        },
+        clientsContacted,
+        clientsInNegotiation,
+        clientsClosed,
+        clientsPostSale,
+        clientsVisited,
+        totalBilledAmount,
+        averageBillingPerService,
+      };
+    })
+  );
+
+  return { data: metrics.filter(Boolean) };
 }
