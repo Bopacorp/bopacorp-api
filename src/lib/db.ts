@@ -12,7 +12,7 @@ function createPool(): pg.Pool {
     connectionString: env.DATABASE_URL,
     max: env.NODE_ENV === 'production' ? 20 : 5,
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 30_000,
   });
 
   newPool.on('error', (err) => {
