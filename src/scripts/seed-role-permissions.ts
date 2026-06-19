@@ -109,6 +109,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'sales_objectives.read',
 
     'users.read',
+
+    'contact_requests.read',
+    'contact_requests.update',
   ],
 
   manager: [
@@ -164,6 +167,22 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
     'departments.read',
     'org_roles.read',
+
+    'contact_requests.read',
+    'contact_requests.update',
+
+    'job_vacancies.create',
+    'job_vacancies.read',
+    'job_vacancies.update',
+    'job_vacancies.delete',
+
+    'job_applications.read',
+    'job_applications.update',
+
+    'candidates.read',
+    'candidates.update',
+
+    'candidate_resumes.read',
   ],
 
   coordinator: [
@@ -183,6 +202,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
     'notifications.read',
     'notifications.update',
+
+    'contact_requests.read',
   ],
 
   'web-admin': [

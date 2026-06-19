@@ -12,7 +12,7 @@ import { businessClients, negotiationStates, negotiations, visits } from '@db/sc
 import { reportExports, salesObjectives } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -335,93 +335,113 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
     .from(userRoles)
     .where(eq(userRoles.roleId, advisorRole.id));
 
+  const advisorIds = advisorRows.map((r) => r.userId);
+
+  if (advisorIds.length === 0) {
+    return { data: [] };
+  }
+
   const stateRows = await db
     .select()
     .from(negotiationStates)
-    .where(sql`${negotiationStates.code} IN (${ADVISOR_STATE_CODES.join(',')})`);
+    .where(inArray(negotiationStates.code, [...ADVISOR_STATE_CODES]));
 
   const stateIds = Object.fromEntries(
     stateRows.map((state) => [state.code as AdvisorStateCode, state.id])
   ) as Record<AdvisorStateCode, string>;
 
-  const metrics = await Promise.all(
-    advisorRows.map(async ({ userId }) => {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-        with: { profile: true },
-      });
+  const advisorUsers = await db.query.users.findMany({
+    where: inArray(users.id, advisorIds),
+    with: { profile: true },
+  });
 
-      if (!user) {
-        return null;
-      }
+  const userMap = new Map(advisorUsers.map((u) => [u.id, u]));
 
-      const negotiationDateConditions = buildDateRangeConditions(query, negotiations.createdAt);
-      const negotiationBaseWhere = and(
-        eq(negotiations.advisorId, userId),
+  const negotiationDateConditions = buildDateRangeConditions(query, negotiations.createdAt);
+
+  const negotiationCounts = await db
+    .select({
+      advisorId: negotiations.advisorId,
+      stateId: negotiations.stateId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(negotiations)
+    .where(
+      and(
+        inArray(negotiations.advisorId, advisorIds),
         isNull(negotiations.deletedAt),
+        inArray(negotiations.stateId, Object.values(stateIds)),
         ...negotiationDateConditions
-      );
+      )
+    )
+    .groupBy(negotiations.advisorId, negotiations.stateId);
 
-      const [clientsContacted, clientsInNegotiation, clientsClosed, clientsPostSale] =
-        await Promise.all([
-          db.$count(
-            negotiations,
-            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.initial_contact))
-          ),
-          db.$count(
-            negotiations,
-            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.negotiation))
-          ),
-          db.$count(
-            negotiations,
-            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.closing))
-          ),
-          db.$count(
-            negotiations,
-            and(negotiationBaseWhere, eq(negotiations.stateId, stateIds.post_sale))
-          ),
-        ]);
+  const negCountMap = new Map<string, Map<string, number>>();
+  for (const row of negotiationCounts) {
+    if (!negCountMap.has(row.advisorId)) {
+      negCountMap.set(row.advisorId, new Map());
+    }
+    negCountMap.get(row.advisorId)?.set(row.stateId, row.count);
+  }
 
-      const visitDateConditions = buildDateRangeConditions(query, visits.visitDate);
-      const visitedClientsResult = await db
-        .select({ count: sql<number>`count(distinct ${visits.clientId})` })
-        .from(visits)
-        .where(and(eq(visits.advisorId, userId), isNull(visits.deletedAt), ...visitDateConditions));
-      const clientsVisited = Number(visitedClientsResult[0]?.count ?? 0);
+  const visitDateConditions = buildDateRangeConditions(query, visits.visitDate);
 
-      const billingResult = await db
-        .select({
-          totalBilled: sql<number>`coalesce(sum(${businessClients.currentMonthlyBilling}), 0)`,
-          totalServices: sql<number>`coalesce(sum(${businessClients.activeServicesCount}), 0)`,
-        })
-        .from(businessClients)
-        .where(and(eq(businessClients.advisorId, userId), isNull(businessClients.deletedAt)));
+  const visitCounts = await db
+    .select({
+      advisorId: visits.advisorId,
+      count: sql<number>`count(distinct ${visits.clientId})::int`,
+    })
+    .from(visits)
+    .where(
+      and(inArray(visits.advisorId, advisorIds), isNull(visits.deletedAt), ...visitDateConditions)
+    )
+    .groupBy(visits.advisorId);
 
-      const totalBilledAmount = Number(billingResult[0]?.totalBilled ?? 0);
-      const totalServices = Number(billingResult[0]?.totalServices ?? 0);
-      const averageBillingPerService = totalServices > 0 ? totalBilledAmount / totalServices : 0;
+  const visitMap = new Map(visitCounts.map((r) => [r.advisorId, r.count]));
+
+  const billingRows = await db
+    .select({
+      advisorId: businessClients.advisorId,
+      totalBilled: sql<number>`coalesce(sum(${businessClients.currentMonthlyBilling}), 0)`,
+      totalServices: sql<number>`coalesce(sum(${businessClients.activeServicesCount}), 0)`,
+    })
+    .from(businessClients)
+    .where(and(inArray(businessClients.advisorId, advisorIds), isNull(businessClients.deletedAt)))
+    .groupBy(businessClients.advisorId);
+
+  const billingMap = new Map(
+    billingRows.map((r) => [
+      r.advisorId,
+      { billed: Number(r.totalBilled), services: Number(r.totalServices) },
+    ])
+  );
+
+  const data = advisorIds
+    .map((advisorId) => {
+      const user = userMap.get(advisorId);
+      if (!user) return null;
+
+      const negCounts = negCountMap.get(advisorId);
+      const billing = billingMap.get(advisorId) ?? { billed: 0, services: 0 };
 
       return {
         advisor: {
           id: user.id,
           username: user.username,
           profile: user.profile
-            ? {
-                firstName: user.profile.firstName,
-                lastName: user.profile.lastName,
-              }
+            ? { firstName: user.profile.firstName, lastName: user.profile.lastName }
             : null,
         },
-        clientsContacted,
-        clientsInNegotiation,
-        clientsClosed,
-        clientsPostSale,
-        clientsVisited,
-        totalBilledAmount,
-        averageBillingPerService,
+        clientsContacted: negCounts?.get(stateIds.initial_contact) ?? 0,
+        clientsInNegotiation: negCounts?.get(stateIds.negotiation) ?? 0,
+        clientsClosed: negCounts?.get(stateIds.closing) ?? 0,
+        clientsPostSale: negCounts?.get(stateIds.post_sale) ?? 0,
+        clientsVisited: visitMap.get(advisorId) ?? 0,
+        totalBilledAmount: billing.billed,
+        averageBillingPerService: billing.services > 0 ? billing.billed / billing.services : 0,
       };
     })
-  );
+    .filter(Boolean);
 
-  return { data: metrics.filter(Boolean) };
+  return { data };
 }
