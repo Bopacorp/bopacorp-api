@@ -1,137 +1,173 @@
-import { catalogItems, segments } from '@db/schema/catalog.js';
+import {
+  catalogItems,
+  categories,
+  connectivityDetails,
+  contractTypes,
+  deviceDetails,
+  digitalDetails,
+  itemBenefits,
+  itemTypes,
+  roamingDetails,
+  segments,
+  tiers,
+  voiceDetails,
+} from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
 const NATURAL_SEGMENT_CODE = 'natural';
 
-async function queryPublicItems(segmentId: string) {
-  return db.query.catalogItems.findMany({
-    where: and(
-      eq(catalogItems.segmentId, segmentId),
-      eq(catalogItems.isActive, true),
-      eq(catalogItems.isPublished, true),
-      isNull(catalogItems.deletedAt)
-    ),
-    with: {
-      category: true,
-      itemType: true,
-      contractType: true,
-      segment: true,
-      tier: true,
-      voiceDetails: true,
-      connectivityDetails: true,
-      digitalDetails: true,
-      roamingDetails: true,
-      deviceDetails: true,
-      benefits: true,
-      ageConditions: true,
-      legalConditions: true,
-      temporalConditions: true,
-    },
-    orderBy: [asc(catalogItems.price)],
-  });
+async function queryPublicCatalogItems() {
+  return db
+    .select({
+      id: catalogItems.id,
+      name: catalogItems.name,
+      description: catalogItems.description,
+      price: catalogItems.price,
+      imagePath: catalogItems.imagePath,
+      permanenceMonths: catalogItems.permanenceMonths,
+      category: { id: categories.id, name: categories.name },
+      itemType: { id: itemTypes.id, code: itemTypes.code, name: itemTypes.name },
+      contractType: { id: contractTypes.id, code: contractTypes.code, name: contractTypes.name },
+      segment: { id: segments.id, code: segments.code, name: segments.name },
+      tier: { id: tiers.id, code: tiers.code, name: tiers.name },
+      voiceDetails: {
+        id: voiceDetails.id,
+        gigasStructural: voiceDetails.gigasStructural,
+        gigasLoyalty: voiceDetails.gigasLoyalty,
+        minutesNational: voiceDetails.minutesNational,
+        minutesLdi: voiceDetails.minutesLdi,
+        sms: voiceDetails.sms,
+        hasUnlimitedMinutes: voiceDetails.hasUnlimitedMinutes,
+        hasUnlimitedWhatsapp: voiceDetails.hasUnlimitedWhatsapp,
+        hasSocialNetworks: voiceDetails.hasSocialNetworks,
+        includedRoamingGb: voiceDetails.includedRoamingGb,
+      },
+      connectivityDetails: {
+        id: connectivityDetails.id,
+        bandwidthMbps: connectivityDetails.bandwidthMbps,
+      },
+      digitalDetails: {
+        id: digitalDetails.id,
+        provider: digitalDetails.provider,
+      },
+      roamingDetails: {
+        id: roamingDetails.id,
+        geoZoneId: roamingDetails.geoZoneId,
+        dataMb: roamingDetails.dataMb,
+        durationDays: roamingDetails.durationDays,
+        hasThrottle: roamingDetails.hasThrottle,
+      },
+      deviceDetails: {
+        id: deviceDetails.id,
+        brand: deviceDetails.brand,
+        model: deviceDetails.model,
+        storageGb: deviceDetails.storageGb,
+        financingMonths: deviceDetails.financingMonths,
+        financingMonthly: deviceDetails.financingMonthly,
+      },
+    })
+    .from(catalogItems)
+    .innerJoin(categories, eq(catalogItems.categoryId, categories.id))
+    .innerJoin(itemTypes, eq(catalogItems.itemTypeId, itemTypes.id))
+    .innerJoin(contractTypes, eq(catalogItems.contractTypeId, contractTypes.id))
+    .innerJoin(segments, eq(catalogItems.segmentId, segments.id))
+    .innerJoin(tiers, eq(catalogItems.tierId, tiers.id))
+    .leftJoin(voiceDetails, eq(catalogItems.id, voiceDetails.itemId))
+    .leftJoin(connectivityDetails, eq(catalogItems.id, connectivityDetails.itemId))
+    .leftJoin(digitalDetails, eq(catalogItems.id, digitalDetails.itemId))
+    .leftJoin(roamingDetails, eq(catalogItems.id, roamingDetails.itemId))
+    .leftJoin(deviceDetails, eq(catalogItems.id, deviceDetails.itemId))
+    .where(
+      and(
+        eq(segments.code, NATURAL_SEGMENT_CODE),
+        eq(catalogItems.isActive, true),
+        eq(catalogItems.isPublished, true),
+        isNull(catalogItems.deletedAt)
+      )
+    )
+    .orderBy(asc(catalogItems.price));
 }
 
-type CatalogItemWithRelations = Awaited<ReturnType<typeof queryPublicItems>>[number];
+type CatalogItemRow = Awaited<ReturnType<typeof queryPublicCatalogItems>>[number];
 
 export async function listPublicCatalogItems() {
-  const naturalSegment = await db
-    .select({ id: segments.id })
-    .from(segments)
-    .where(eq(segments.code, NATURAL_SEGMENT_CODE))
-    .limit(1);
+  const rows = await queryPublicCatalogItems();
 
-  const segmentId = naturalSegment[0]?.id;
-  if (!segmentId) return [];
+  const itemIds = rows.map((row) => row.id);
+  const benefits =
+    itemIds.length > 0
+      ? await db.select().from(itemBenefits).where(inArray(itemBenefits.itemId, itemIds))
+      : [];
 
-  const items = await queryPublicItems(segmentId);
-  return items.map(toPublicCatalogItem);
+  const benefitsByItemId = new Map<string, typeof benefits>();
+  for (const benefit of benefits) {
+    const list = benefitsByItemId.get(benefit.itemId) ?? [];
+    list.push(benefit);
+    benefitsByItemId.set(benefit.itemId, list);
+  }
+
+  return rows.map((row) => toPublicCatalogItem(row, benefitsByItemId.get(row.id) ?? []));
 }
 
-type PublicCatalogItem = ReturnType<typeof toPublicCatalogItem>;
-
-function toPublicCatalogItem(item: CatalogItemWithRelations) {
+function toPublicCatalogItem(
+  row: CatalogItemRow,
+  benefits: (typeof itemBenefits)['$inferSelect'][]
+) {
   return {
-    id: item.id,
-    name: item.name,
-    description: item.description,
-    price: Number.parseFloat(item.price),
-    imagePath: item.imagePath,
-    permanenceMonths: item.permanenceMonths,
-    category: item.category ? { id: item.category.id, name: item.category.name } : null,
-    itemType: item.itemType
-      ? { id: item.itemType.id, code: item.itemType.code, name: item.itemType.name }
-      : null,
-    contractType: item.contractType
-      ? { id: item.contractType.id, code: item.contractType.code, name: item.contractType.name }
-      : null,
-    segment: item.segment
-      ? { id: item.segment.id, code: item.segment.code, name: item.segment.name }
-      : null,
-    tier: item.tier ? { id: item.tier.id, code: item.tier.code, name: item.tier.name } : null,
-    voiceDetails: item.voiceDetails ? toVoiceDetails(item.voiceDetails) : null,
-    connectivityDetails: item.connectivityDetails
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    price: Number.parseFloat(row.price),
+    imagePath: row.imagePath,
+    permanenceMonths: row.permanenceMonths,
+    category: row.category,
+    itemType: row.itemType,
+    contractType: row.contractType,
+    segment: row.segment,
+    tier: row.tier,
+    voiceDetails: row.voiceDetails?.id ? toVoiceDetails(row.voiceDetails) : null,
+    connectivityDetails: row.connectivityDetails?.id
       ? {
-          id: item.connectivityDetails.id,
-          bandwidthMbps: Number.parseFloat(item.connectivityDetails.bandwidthMbps),
+          id: row.connectivityDetails.id,
+          bandwidthMbps: Number.parseFloat(row.connectivityDetails.bandwidthMbps),
         }
       : null,
-    digitalDetails: item.digitalDetails
-      ? { id: item.digitalDetails.id, provider: item.digitalDetails.provider }
+    digitalDetails: row.digitalDetails?.id
+      ? { id: row.digitalDetails.id, provider: row.digitalDetails.provider }
       : null,
-    roamingDetails: item.roamingDetails
+    roamingDetails: row.roamingDetails?.id
       ? {
-          id: item.roamingDetails.id,
-          geoZoneId: item.roamingDetails.geoZoneId,
-          dataMb: item.roamingDetails.dataMb,
-          durationDays: item.roamingDetails.durationDays,
-          hasThrottle: item.roamingDetails.hasThrottle,
+          id: row.roamingDetails.id,
+          geoZoneId: row.roamingDetails.geoZoneId,
+          dataMb: row.roamingDetails.dataMb,
+          durationDays: row.roamingDetails.durationDays,
+          hasThrottle: row.roamingDetails.hasThrottle,
         }
       : null,
-    deviceDetails: item.deviceDetails
+    deviceDetails: row.deviceDetails?.id
       ? {
-          id: item.deviceDetails.id,
-          brand: item.deviceDetails.brand,
-          model: item.deviceDetails.model,
-          storageGb: item.deviceDetails.storageGb,
-          financingMonths: item.deviceDetails.financingMonths,
-          financingMonthly: item.deviceDetails.financingMonthly
-            ? Number.parseFloat(item.deviceDetails.financingMonthly)
+          id: row.deviceDetails.id,
+          brand: row.deviceDetails.brand,
+          model: row.deviceDetails.model,
+          storageGb: row.deviceDetails.storageGb,
+          financingMonths: row.deviceDetails.financingMonths,
+          financingMonthly: row.deviceDetails.financingMonthly
+            ? Number.parseFloat(row.deviceDetails.financingMonthly)
             : null,
         }
       : null,
-    benefits: item.benefits.map((b) => ({
+    benefits: benefits.map((b) => ({
       id: b.id,
       benefitTypeId: b.benefitTypeId,
       name: b.name,
       description: b.description,
       durationDays: b.durationDays,
     })),
-    ageConditions: item.ageConditions
-      ? {
-          id: item.ageConditions.id,
-          minAge: item.ageConditions.minAge,
-          maxAge: item.ageConditions.maxAge,
-        }
-      : null,
-    legalConditions: item.legalConditions
-      ? {
-          id: item.legalConditions.id,
-          legalRequirement: item.legalConditions.legalRequirement,
-          description: item.legalConditions.description,
-        }
-      : null,
-    temporalConditions: item.temporalConditions
-      ? {
-          id: item.temporalConditions.id,
-          effectiveDate: item.temporalConditions.effectiveDate,
-          expirationDate: item.temporalConditions.expirationDate,
-        }
-      : null,
   };
 }
 
-function toVoiceDetails(detail: NonNullable<CatalogItemWithRelations['voiceDetails']>) {
+function toVoiceDetails(detail: NonNullable<CatalogItemRow['voiceDetails']>) {
   return {
     id: detail.id,
     gigasStructural: detail.gigasStructural,
@@ -146,4 +182,4 @@ function toVoiceDetails(detail: NonNullable<CatalogItemWithRelations['voiceDetai
   };
 }
 
-export type { PublicCatalogItem };
+export type { CatalogItemRow as PublicCatalogItem };
