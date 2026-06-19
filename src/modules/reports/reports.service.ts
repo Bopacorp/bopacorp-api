@@ -438,7 +438,8 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
         clientsPostSale: negCounts?.get(stateIds.post_sale) ?? 0,
         clientsVisited: visitMap.get(advisorId) ?? 0,
         totalBilledAmount: billing.billed,
-        averageBillingPerService: billing.services > 0 ? billing.billed / billing.services : 0,
+        averageBillingPerService:
+          billing.services > 0 ? Math.round((billing.billed / billing.services) * 100) / 100 : 0,
       };
     })
     .filter(Boolean);
