@@ -6,7 +6,7 @@ import type {
   ListSalesObjectivesQuery,
   UpdateSalesObjectiveRequest,
 } from '@bopacorp/shared/reports';
-import { UnauthorizedError } from '@shared/errors/http-error.js';
+import { ForbiddenError, UnauthorizedError } from '@shared/errors/http-error.js';
 import type { Request, Response } from 'express';
 import * as service from './reports.service.js';
 
@@ -67,7 +67,18 @@ export async function createExport(req: Request, res: Response) {
 
 // ── Advisor Metrics ──
 
+const MANAGEMENT_ROLES = ['admin', 'manager', 'supervisor', 'coordinator'];
+
 export async function listAdvisorMetrics(req: Request, res: Response) {
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
+
+  const canViewMetrics = req.user.roles.some((role) => MANAGEMENT_ROLES.includes(role));
+  if (!canViewMetrics) {
+    throw new ForbiddenError('Management access required');
+  }
+
   const query = req.query as unknown as ListAdvisorMetricsQuery;
   const result = await service.listAdvisorMetrics(query);
   res.json({ success: true, data: result.data });
