@@ -6,7 +6,7 @@ import { logger } from '@lib/logger.js';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { contentBlocks, contentTypes } from '../db/schema/catalog.js';
 
-type ContentTypeIds = Record<ContentTypeCode, string>;
+type TextTypeId = Record<ContentTypeCode.TEXT, string>;
 
 async function getContentTypeId(code: ContentTypeCode): Promise<string> {
   const [row] = await db
@@ -21,121 +21,170 @@ async function getContentTypeId(code: ContentTypeCode): Promise<string> {
   return row.id;
 }
 
-const buildBlocks = (typeIds: ContentTypeIds): CreateContentBlockRequest[] => [
-  {
-    contentKey: 'hero.title',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Titulo Hero',
-    body: 'Bienvenido a Bopacorp',
-    sortOrder: 1,
-  },
-  {
-    contentKey: 'hero.subtitle',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Subtitulo Hero',
-    body: 'Soluciones de telecomunicaciones corporativas en Ecuador',
-    sortOrder: 2,
-  },
-  {
-    contentKey: 'hero.cta',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Boton Hero',
-    body: 'Cotizar ahora',
-    sortOrder: 3,
-  },
-  {
-    contentKey: 'hero.background',
-    contentTypeId: typeIds[ContentTypeCode.IMAGE],
-    title: 'Fondo Hero',
-    body: 'https://placehold.co/1920x800/0a0a2e/ffffff?text=Bopacorp+Hero',
-    sortOrder: 4,
-  },
-  {
-    contentKey: 'features.title',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Titulo Servicios',
-    body: 'Nuestros Servicios',
-    sortOrder: 10,
-  },
-  {
-    contentKey: 'features.subtitle',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Subtitulo Servicios',
-    body: 'Descubre todo lo que podemos hacer por tu empresa',
-    sortOrder: 11,
-  },
-  {
-    contentKey: 'features.item.1',
-    contentTypeId: typeIds[ContentTypeCode.HTML],
-    title: 'Servicio 1',
-    body: '<div class="feature-card"><h3>Conectividad Empresarial</h3><p>Internet dedicado de alta velocidad con SLA garantizado.</p></div>',
-    sortOrder: 12,
-  },
-  {
-    contentKey: 'features.item.2',
-    contentTypeId: typeIds[ContentTypeCode.HTML],
-    title: 'Servicio 2',
-    body: '<div class="feature-card"><h3>Planes Corporativos Movistar</h3><p>Planes de voz y datos para equipos corporativos con beneficios exclusivos.</p></div>',
-    sortOrder: 13,
-  },
-  {
-    contentKey: 'features.item.3',
-    contentTypeId: typeIds[ContentTypeCode.HTML],
-    title: 'Servicio 3',
-    body: '<div class="feature-card"><h3>Servicios Digitales</h3><p>Desarrollo de software, presencia web y transformacion digital para tu negocio.</p></div>',
-    sortOrder: 14,
-  },
-  {
-    contentKey: 'banner.promo',
-    contentTypeId: typeIds[ContentTypeCode.BANNER],
-    title: 'Banner Promocional',
-    body: '<div style="background:linear-gradient(135deg,#1a1a4e,#2d2d8a);padding:40px;border-radius:12px;text-align:center;color:white"><h2 style="margin:0 0 8px">Oferta Especial</h2><p style="margin:0">Contrata 2 servicios y obten 15% de descuento el primer trimestre</p></div>',
-    sortOrder: 20,
-  },
-  {
-    contentKey: 'video.intro',
-    contentTypeId: typeIds[ContentTypeCode.VIDEO],
-    title: 'Video Introductorio',
-    body: '<iframe width="100%" height="400" src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video Bopacorp" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>',
-    sortOrder: 30,
-  },
-  {
-    contentKey: 'cta.title',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Titulo CTA',
-    body: 'Impulsa tu negocio con Bopacorp',
-    sortOrder: 40,
-  },
-  {
-    contentKey: 'cta.button',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Boton CTA',
-    body: 'Solicitar una cotizacion',
-    sortOrder: 41,
-  },
-  {
-    contentKey: 'footer.text',
-    contentTypeId: typeIds[ContentTypeCode.TEXT],
-    title: 'Texto Footer',
-    body: '2026 BOPACORP S.A. Todos los derechos reservados.',
-    sortOrder: 50,
-  },
-  {
-    contentKey: 'footer.links',
-    contentTypeId: typeIds[ContentTypeCode.HTML],
-    title: 'Links Footer',
-    body: '<ul><li><a href="#">Terminos y Condiciones</a></li><li><a href="#">Politicas de Privacidad</a></li><li><a href="#">Contacto</a></li></ul>',
-    sortOrder: 51,
-  },
+function buildHeroBlocks(textId: string): CreateContentBlockRequest[] {
+  return [
+    {
+      contentKey: 'hero.title',
+      contentTypeId: textId,
+      title: 'Hero - Título',
+      body: 'Conectividad que impulsa tu negocio',
+      sortOrder: 10,
+    },
+    {
+      contentKey: 'hero.highlight',
+      contentTypeId: textId,
+      title: 'Hero - Resaltado',
+      body: 'impulsa',
+      sortOrder: 20,
+    },
+    {
+      contentKey: 'hero.description',
+      contentTypeId: textId,
+      title: 'Hero - Descripción',
+      body: 'Conectamos tu negocio con tecnología de punta. Planes corporativos, conectividad de alta velocidad y servicios digitales diseñados para impulsar tu empresa.',
+      sortOrder: 30,
+    },
+    {
+      contentKey: 'hero.cta_primary_label',
+      contentTypeId: textId,
+      title: 'Hero - CTA Primario',
+      body: 'Ver catálogo de servicios',
+      sortOrder: 40,
+    },
+    {
+      contentKey: 'hero.cta_secondary_label',
+      contentTypeId: textId,
+      title: 'Hero - CTA Secundario',
+      body: 'Conoce más',
+      sortOrder: 50,
+    },
+  ];
+}
+
+function buildAboutBlocks(textId: string): CreateContentBlockRequest[] {
+  return [
+    {
+      contentKey: 'about.eyebrow',
+      contentTypeId: textId,
+      title: 'About - Etiqueta',
+      body: 'Por qué Bopacorp',
+      sortOrder: 110,
+    },
+    {
+      contentKey: 'about.title',
+      contentTypeId: textId,
+      title: 'About - Título',
+      body: 'Más que un proveedor, un aliado tecnológico',
+      sortOrder: 120,
+    },
+    {
+      contentKey: 'about.description',
+      contentTypeId: textId,
+      title: 'About - Descripción',
+      body: 'Como Partner de una de las empresas de telecomunicaciones más grandes de Ecuador, en Bohorquez & Pauta Corp (Bopacorp S.A.) innovamos desde nuestra matriz en Guayaquil para brindar soluciones integradas de conectividad, equipos informáticos y tecnología celular a nivel nacional.',
+      sortOrder: 130,
+    },
+    {
+      contentKey: 'about.feature_1_title',
+      contentTypeId: textId,
+      title: 'About - Feature 1 Título',
+      body: 'Asesoría Corporativa Personalizada',
+      sortOrder: 140,
+    },
+    {
+      contentKey: 'about.feature_1_desc',
+      contentTypeId: textId,
+      title: 'About - Feature 1 Descripción',
+      body: 'No vendemos planes genéricos. Analizamos la infraestructura de tu empresa para diseñar una solución a la medida de tus necesidades de comunicación y presupuesto.',
+      sortOrder: 150,
+    },
+    {
+      contentKey: 'about.feature_2_title',
+      contentTypeId: textId,
+      title: 'About - Feature 2 Título',
+      body: 'Garantía de Continuidad y Conectividad',
+      sortOrder: 160,
+    },
+    {
+      contentKey: 'about.feature_2_desc',
+      contentTypeId: textId,
+      title: 'About - Feature 2 Descripción',
+      body: 'Aseguramos la operación de tu negocio con enlaces dedicados de fibra óptica y redes móviles de alta velocidad respaldadas por la infraestructura más robusta del país.',
+      sortOrder: 170,
+    },
+    {
+      contentKey: 'about.feature_3_title',
+      contentTypeId: textId,
+      title: 'About - Feature 3 Título',
+      body: 'Soporte Técnico Especializado',
+      sortOrder: 180,
+    },
+    {
+      contentKey: 'about.feature_3_desc',
+      contentTypeId: textId,
+      title: 'About - Feature 3 Descripción',
+      body: 'Acompañamos el crecimiento de tus proyectos con un equipo de atención dedicado a resolver incidencias rápidamente, garantizando la estabilidad de tus sistemas.',
+      sortOrder: 190,
+    },
+  ];
+}
+
+function buildCtaBlocks(textId: string): CreateContentBlockRequest[] {
+  return [
+    {
+      contentKey: 'cta.eyebrow',
+      contentTypeId: textId,
+      title: 'CTA - Etiqueta',
+      body: '¿Listo para conectar tu empresa?',
+      sortOrder: 210,
+    },
+    {
+      contentKey: 'cta.title',
+      contentTypeId: textId,
+      title: 'CTA - Título',
+      body: 'Impulsa tu negocio con conectividad real',
+      sortOrder: 220,
+    },
+    {
+      contentKey: 'cta.highlight',
+      contentTypeId: textId,
+      title: 'CTA - Resaltado',
+      body: 'conectividad real',
+      sortOrder: 230,
+    },
+    {
+      contentKey: 'cta.description',
+      contentTypeId: textId,
+      title: 'CTA - Descripción',
+      body: 'Habla con uno de nuestros asesores y encuentra el plan corporativo ideal para tu empresa. Sin compromisos.',
+      sortOrder: 240,
+    },
+    {
+      contentKey: 'cta.primary_label',
+      contentTypeId: textId,
+      title: 'CTA - Botón Primario',
+      body: 'Cotizar Ahora',
+      sortOrder: 250,
+    },
+    {
+      contentKey: 'cta.secondary_label',
+      contentTypeId: textId,
+      title: 'CTA - Botón Secundario',
+      body: 'Ver Planes',
+      sortOrder: 260,
+    },
+  ];
+}
+
+const buildBlocks = (typeIds: TextTypeId): CreateContentBlockRequest[] => [
+  ...buildHeroBlocks(typeIds.TEXT),
+  ...buildAboutBlocks(typeIds.TEXT),
+  ...buildCtaBlocks(typeIds.TEXT),
 ];
 
 async function seed() {
-  const typeIds: ContentTypeIds = {
+  const typeIds: TextTypeId = {
     TEXT: await getContentTypeId(ContentTypeCode.TEXT),
-    HTML: await getContentTypeId(ContentTypeCode.HTML),
-    IMAGE: await getContentTypeId(ContentTypeCode.IMAGE),
-    BANNER: await getContentTypeId(ContentTypeCode.BANNER),
-    VIDEO: await getContentTypeId(ContentTypeCode.VIDEO),
   };
 
   const blocks = buildBlocks(typeIds);
