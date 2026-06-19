@@ -1,5 +1,5 @@
 import type { CreateContactRequest, ListContactRequestsQuery } from '@bopacorp/shared/catalog';
-import { contactRequests } from '@db/schema/catalog.js';
+import { catalogItems, contactRequests } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import { and, eq, ilike, or } from 'drizzle-orm';
@@ -19,7 +19,8 @@ export async function listContactRequests(query: ListContactRequestsQuery) {
     conditions.push(
       or(
         ilike(contactRequests.clientName, `%${query.search}%`),
-        ilike(contactRequests.clientEmail, `%${query.search}%`)
+        ilike(contactRequests.clientEmail, `%${query.search}%`),
+        ilike(contactRequests.clientPhone, `%${query.search}%`)
       )
     );
   }
@@ -30,26 +31,19 @@ export async function listContactRequests(query: ListContactRequestsQuery) {
   const totalPages = Math.ceil(totalItems / query.limit);
 
   const rows = await db
-    .select()
+    .select({
+      request: contactRequests,
+      itemName: catalogItems.name,
+    })
     .from(contactRequests)
+    .leftJoin(catalogItems, eq(contactRequests.itemId, catalogItems.id))
     .where(where)
     .orderBy(contactRequests.createdAt)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit);
 
   return {
-    data: rows.map((row) => ({
-      id: row.id,
-      itemId: row.itemId,
-      clientName: row.clientName,
-      clientEmail: row.clientEmail,
-      clientPhone: row.clientPhone,
-      message: row.message,
-      isAttended: row.isAttended,
-      attendedAt: row.attendedAt ? row.attendedAt.toISOString() : null,
-      attendedBy: row.attendedBy,
-      createdAt: row.createdAt ? row.createdAt.toISOString() : '',
-    })),
+    data: rows.map((row) => toContactRequestResponse(row.request, row.itemName)),
     meta: {
       page: query.page,
       limit: query.limit,
@@ -60,24 +54,21 @@ export async function listContactRequests(query: ListContactRequestsQuery) {
 }
 
 export async function getContactRequestById(id: string) {
-  const [request] = await db.select().from(contactRequests).where(eq(contactRequests.id, id));
+  const rows = await db
+    .select({
+      request: contactRequests,
+      itemName: catalogItems.name,
+    })
+    .from(contactRequests)
+    .leftJoin(catalogItems, eq(contactRequests.itemId, catalogItems.id))
+    .where(eq(contactRequests.id, id));
 
-  if (!request) {
+  const row = rows[0];
+  if (!row) {
     throw new NotFoundError('Contact request', id);
   }
 
-  return {
-    id: request.id,
-    itemId: request.itemId,
-    clientName: request.clientName,
-    clientEmail: request.clientEmail,
-    clientPhone: request.clientPhone,
-    message: request.message,
-    isAttended: request.isAttended,
-    attendedAt: request.attendedAt ? request.attendedAt.toISOString() : null,
-    attendedBy: request.attendedBy,
-    createdAt: request.createdAt ? request.createdAt.toISOString() : '',
-  };
+  return toContactRequestResponse(row.request, row.itemName);
 }
 
 export async function createContactRequest(input: CreateContactRequest) {
@@ -96,26 +87,11 @@ export async function createContactRequest(input: CreateContactRequest) {
     throw new NotFoundError('Contact request', 'create failed');
   }
 
-  return {
-    id: request.id,
-    itemId: request.itemId,
-    clientName: request.clientName,
-    clientEmail: request.clientEmail,
-    clientPhone: request.clientPhone,
-    message: request.message,
-    isAttended: request.isAttended,
-    attendedAt: request.attendedAt ? request.attendedAt.toISOString() : null,
-    attendedBy: request.attendedBy,
-    createdAt: request.createdAt ? request.createdAt.toISOString() : '',
-  };
+  return toContactRequestResponse(request, null);
 }
 
 export async function attendContactRequest(id: string, userId: string) {
-  const [request] = await db.select().from(contactRequests).where(eq(contactRequests.id, id));
-
-  if (!request) {
-    throw new NotFoundError('Contact request', id);
-  }
+  const request = await getContactRequestById(id);
 
   const [updated] = await db
     .update(contactRequests)
@@ -131,16 +107,24 @@ export async function attendContactRequest(id: string, userId: string) {
     throw new NotFoundError('Contact request', id);
   }
 
+  return toContactRequestResponse(updated, request.itemName);
+}
+
+function toContactRequestResponse(
+  request: (typeof contactRequests)['$inferSelect'],
+  itemName: string | null
+) {
   return {
-    id: updated.id,
-    itemId: updated.itemId,
-    clientName: updated.clientName,
-    clientEmail: updated.clientEmail,
-    clientPhone: updated.clientPhone,
-    message: updated.message,
-    isAttended: updated.isAttended,
-    attendedAt: updated.attendedAt ? updated.attendedAt.toISOString() : null,
-    attendedBy: updated.attendedBy,
-    createdAt: updated.createdAt ? updated.createdAt.toISOString() : '',
+    id: request.id,
+    itemId: request.itemId,
+    itemName,
+    clientName: request.clientName,
+    clientEmail: request.clientEmail,
+    clientPhone: request.clientPhone,
+    message: request.message,
+    isAttended: request.isAttended,
+    attendedAt: request.attendedAt ? request.attendedAt.toISOString() : null,
+    attendedBy: request.attendedBy,
+    createdAt: request.createdAt ? request.createdAt.toISOString() : '',
   };
 }

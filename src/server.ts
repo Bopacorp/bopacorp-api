@@ -12,6 +12,7 @@ import { employabilityRoutes } from '@modules/employability/employability.routes
 import { matricesRoutes } from '@modules/matrices/matrices.routes.js';
 import { notificationsRoutes } from '@modules/notifications/notifications.routes.js';
 import { orgRoutes } from '@modules/org/org.routes.js';
+import { publicCatalogRoutes } from '@modules/public-catalog/public-catalog.routes.js';
 import { reportsRoutes } from '@modules/reports/reports.routes.js';
 import { rolesRoutes } from '@modules/roles/roles.routes.js';
 import { uploadsRoutes } from '@modules/uploads/uploads.routes.js';
@@ -55,6 +56,7 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.use('/api/v1/public/catalog', publicCatalogRoutes);
 app.use('/api/v1/catalog', authenticate, catalogRoutes);
 app.use('/api/v1/catalog-items', authenticate, catalogItemsRoutes);
 app.use('/api/v1/contact-requests', contactRequestsRoutes);
