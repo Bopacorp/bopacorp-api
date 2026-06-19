@@ -1,6 +1,7 @@
 import {
   CreateReportExportRequestSchema,
   CreateSalesObjectiveRequestSchema,
+  ListAdvisorMetricsQuerySchema,
   ListReportExportsQuerySchema,
   ListSalesObjectivesQuerySchema,
   UpdateSalesObjectiveRequestSchema,
@@ -80,4 +81,14 @@ reportsRoutes.post(
   authorize('report_exports.create'),
   validate({ body: CreateReportExportRequestSchema }),
   controller.createExport
+);
+
+// ── Advisor Metrics ──
+
+reportsRoutes.get(
+  '/advisor-metrics',
+  authenticate,
+  authorize('reports.read'),
+  validate({ query: ListAdvisorMetricsQuerySchema }),
+  controller.listAdvisorMetrics
 );
