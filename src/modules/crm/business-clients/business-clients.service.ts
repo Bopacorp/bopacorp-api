@@ -18,8 +18,9 @@ function getSortColumn(sortBy?: string): AnyColumn {
     contactName: businessClients.contactName,
     ruc: businessClients.ruc,
     createdAt: businessClients.createdAt,
+    updatedAt: businessClients.updatedAt,
   };
-  return (sortBy && map[sortBy]) || businessClients.createdAt;
+  return (sortBy && map[sortBy]) || businessClients.updatedAt;
 }
 
 export async function listBusinessClients(
