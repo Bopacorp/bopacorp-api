@@ -12,13 +12,8 @@ import { businessClients, negotiationStates, negotiations, visits } from '@db/sc
 import { reportExports, salesObjectives } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
+import { formatDateTime } from '@shared/utils/format.js';
 import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
-
-// ── Helpers ──
-
-function formatDateTime(d: Date | null): string {
-  return d ? d.toISOString() : '';
-}
 
 // ── Sales Objectives ──
 

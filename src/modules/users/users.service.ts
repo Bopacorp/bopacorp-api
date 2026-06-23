@@ -3,6 +3,7 @@ import { roles, userRoles, users } from '@db/schema/auth.js';
 import { profiles } from '@db/schema/core.js';
 import { createAuditLog } from '@lib/audit.js';
 import { db } from '@lib/db.js';
+import { BCRYPT_SALT_ROUNDS } from '@shared/constants/auth.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import bcrypt from 'bcrypt';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, type SQL } from 'drizzle-orm';
@@ -190,7 +191,7 @@ export async function createUser(
     throw new ConflictError(`User with email '${data.email}' already exists`);
   }
 
-  const passwordHash = await bcrypt.hash(data.password, 12);
+  const passwordHash = await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS);
 
   const newUser = await db.transaction(async (tx) => {
     const [user] = await tx

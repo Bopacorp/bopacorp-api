@@ -11,6 +11,7 @@ import { authTokens, loginLogs, permissions, rolePermissions, users } from '@db/
 import { createAuditLog } from '@lib/audit.js';
 import { db } from '@lib/db.js';
 import { createModuleLogger } from '@lib/logger.js';
+import { BCRYPT_SALT_ROUNDS } from '@shared/constants/auth.js';
 import { HttpError, NotFoundError, UnauthorizedError } from '@shared/errors/http-error.js';
 import bcrypt from 'bcrypt';
 import { and, count, eq, gt, gte, inArray, isNull, lt } from 'drizzle-orm';
@@ -114,6 +115,25 @@ async function checkIpRateLimit(ipAddress: string | undefined) {
       'RATE_LIMITED'
     );
   }
+}
+
+async function fetchPermissionCodes(roleIds: string[]): Promise<string[]> {
+  if (roleIds.length === 0) return [];
+
+  const rolePerms = await db
+    .select({ code: permissions.code })
+    .from(rolePermissions)
+    .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+    .where(and(eq(rolePermissions.isGranted, true), inArray(rolePermissions.roleId, roleIds)));
+
+  const codes = new Set<string>();
+  for (const rp of rolePerms) {
+    if (rp.code) {
+      codes.add(rp.code);
+    }
+  }
+
+  return Array.from(codes);
 }
 
 async function cleanupExpiredRefreshTokens(userId: string) {
@@ -224,26 +244,13 @@ export const authService = {
     await cleanupExpiredRefreshTokens(user.id);
 
     const roleIds = user.userRoles.map((ur) => ur.roleId);
-    const permissionCodes = new Set<string>();
-
-    if (roleIds.length > 0) {
-      const rolePerms = await db
-        .select({ code: permissions.code })
-        .from(rolePermissions)
-        .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-        .where(and(eq(rolePermissions.isGranted, true), inArray(rolePermissions.roleId, roleIds)));
-      for (const rp of rolePerms) {
-        if (rp.code) {
-          permissionCodes.add(rp.code);
-        }
-      }
-    }
+    const permissionCodes = await fetchPermissionCodes(roleIds);
 
     const accessToken = generateAccessToken(
       user.id,
       user.email,
       user.userRoles.map((ur) => ur.role.slug),
-      Array.from(permissionCodes)
+      permissionCodes
     );
     const refreshTokenRaw = generateOpaqueToken();
     const refreshTokenHash = hashToken(refreshTokenRaw);
@@ -262,7 +269,7 @@ export const authService = {
         username: user.username,
         email: user.email,
         roles: user.userRoles.map((ur) => ur.role.slug),
-        permissions: Array.from(permissionCodes),
+        permissions: permissionCodes,
         profile: user.profile
           ? {
               id: user.profile.id,
@@ -330,32 +337,14 @@ export const authService = {
       with: { role: true },
     });
 
-    const refreshedRoleIds = activeUserRoles.map((ur) => ur.roleId);
-    const refreshedPermissionCodes = new Set<string>();
-
-    if (refreshedRoleIds.length > 0) {
-      const refreshedRolePerms = await db
-        .select({ code: permissions.code })
-        .from(rolePermissions)
-        .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-        .where(
-          and(
-            eq(rolePermissions.isGranted, true),
-            inArray(rolePermissions.roleId, refreshedRoleIds)
-          )
-        );
-      for (const rp of refreshedRolePerms) {
-        if (rp.code) {
-          refreshedPermissionCodes.add(rp.code);
-        }
-      }
-    }
+    const roleIds = activeUserRoles.map((ur) => ur.roleId);
+    const permissionCodes = await fetchPermissionCodes(roleIds);
 
     const accessToken = generateAccessToken(
       user.id,
       user.email,
       activeUserRoles.map((ur) => ur.role.slug),
-      Array.from(refreshedPermissionCodes)
+      permissionCodes
     );
     const newRefreshTokenRaw = generateOpaqueToken();
     const newRefreshTokenHash = hashToken(newRefreshTokenRaw);
@@ -426,7 +415,7 @@ export const authService = {
       throw new UnauthorizedError('Invalid or expired reset token');
     }
 
-    const passwordHash = await bcrypt.hash(data.newPassword, 12);
+    const passwordHash = await bcrypt.hash(data.newPassword, BCRYPT_SALT_ROUNDS);
 
     await db.update(users).set({ passwordHash }).where(eq(users.id, user.id));
 
@@ -465,7 +454,7 @@ export const authService = {
       throw new UnauthorizedError('Current password is incorrect');
     }
 
-    const passwordHash = await bcrypt.hash(data.newPassword, 12);
+    const passwordHash = await bcrypt.hash(data.newPassword, BCRYPT_SALT_ROUNDS);
 
     await db.update(users).set({ passwordHash }).where(eq(users.id, user.id));
 

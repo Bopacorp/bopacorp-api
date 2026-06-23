@@ -3,15 +3,9 @@ import type {
   ListAdvisorSupervisorsQuery,
 } from '@bopacorp/shared/core';
 import { UnauthorizedError } from '@shared/errors/http-error.js';
+import { getClientInfo } from '@shared/utils/request.js';
 import type { Request, Response } from 'express';
 import * as service from './advisor-supervisors.service.js';
-
-function getClientInfo(req: Request) {
-  const info: { ipAddress?: string; userAgent?: string } = {};
-  if (req.ip) info.ipAddress = req.ip;
-  if (req.headers['user-agent']) info.userAgent = req.headers['user-agent'];
-  return info;
-}
 
 export async function listSupervisors(req: Request<{ userId: string }>, res: Response) {
   const query = req.query as unknown as ListAdvisorSupervisorsQuery;

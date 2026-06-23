@@ -27,11 +27,8 @@ import {
   InternalServerError,
   NotFoundError,
 } from '@shared/errors/http-error.js';
-import { type AnyColumn, and, asc, desc, eq, ilike, isNull } from 'drizzle-orm';
-
-function getOrderBy(column: AnyColumn, order: 'asc' | 'desc') {
-  return order === 'desc' ? desc(column) : asc(column);
-}
+import { getOrderBy } from '@shared/utils/query.js';
+import { type AnyColumn, and, eq, ilike, isNull } from 'drizzle-orm';
 
 function getCatalogItemSortColumn(sortBy?: string): AnyColumn {
   const map: Record<string, AnyColumn> = {
