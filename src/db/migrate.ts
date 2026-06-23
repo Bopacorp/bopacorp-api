@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
+// biome-ignore lint/complexity/useLiteralKeys: TS4111 requires bracket notation for index signatures
 const connectionString = process.env['DIRECT_URL'] || process.env['DATABASE_URL'];
 
 if (!connectionString) {
