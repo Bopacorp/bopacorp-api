@@ -7,11 +7,8 @@ import { users } from '@db/schema/auth.js';
 import { notifications } from '@db/schema/notifications.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
+import { formatDateTime } from '@shared/utils/format.js';
 import { and, eq } from 'drizzle-orm';
-
-function formatDateTime(d: Date | null): string {
-  return d ? d.toISOString() : '';
-}
 
 export async function listNotifications(userId: string, query: ListNotificationsQuery) {
   const conditions = [eq(notifications.recipientId, userId)];

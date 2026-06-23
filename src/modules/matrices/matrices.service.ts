@@ -21,13 +21,8 @@ import {
 } from '@db/schema/matrices.js';
 import { db } from '@lib/db.js';
 import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
+import { formatDateTime } from '@shared/utils/format.js';
 import { and, eq, ilike, isNull, type SQL, sql } from 'drizzle-orm';
-
-// ── Helpers ──
-
-function formatDateTime(d: Date | null): string {
-  return d ? d.toISOString() : '';
-}
 
 // ── Offer Matrices ──
 
