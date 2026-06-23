@@ -257,6 +257,12 @@ async function seed() {
       description: 'Seguimiento y soporte despues del cierre',
       position: 5,
     },
+    {
+      code: 'denied',
+      name: 'Negado',
+      description: 'Cliente rechazo la oferta o se perdio la negociacion',
+      position: 6,
+    },
   ]);
 
   const stateMap = new Map(states.map((s) => [s.code, s]));

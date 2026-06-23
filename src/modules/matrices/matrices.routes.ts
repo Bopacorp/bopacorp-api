@@ -1,13 +1,8 @@
 import {
-  ChangeMatrixStateRequestSchema,
   CreateMatrixAttachmentRequestSchema,
-  CreateMatrixLineItemRequestSchema,
   CreateOfferMatrixRequestSchema,
   ListMatrixAttachmentsQuerySchema,
-  ListMatrixLineItemsQuerySchema,
-  ListMatrixStateHistoryQuerySchema,
   ListOfferMatricesQuerySchema,
-  UpdateMatrixLineItemRequestSchema,
   UpdateOfferMatrixRequestSchema,
 } from '@bopacorp/shared/matrices';
 import { authenticate } from '@shared/middleware/authenticate.js';
@@ -61,48 +56,6 @@ matricesRoutes.delete(
   controller.removeOfferMatrix
 );
 
-matricesRoutes.patch(
-  '/:id/state',
-  authenticate,
-  authorize('offer_matrices.change_state'),
-  validate({ params: IdParamSchema, body: ChangeMatrixStateRequestSchema }),
-  controller.changeMatrixState
-);
-
-// ── Matrix Line Items ──
-
-matricesRoutes.get(
-  '/:id/line-items',
-  authenticate,
-  authorize('matrix_line_items.read'),
-  validate({ params: IdParamSchema, query: ListMatrixLineItemsQuerySchema }),
-  controller.listMatrixLineItems
-);
-
-matricesRoutes.post(
-  '/:id/line-items',
-  authenticate,
-  authorize('matrix_line_items.create'),
-  validate({ params: IdParamSchema, body: CreateMatrixLineItemRequestSchema }),
-  controller.createMatrixLineItem
-);
-
-matricesRoutes.patch(
-  '/:id/line-items/:lineItemId',
-  authenticate,
-  authorize('matrix_line_items.update'),
-  validate({ params: IdParamSchema, body: UpdateMatrixLineItemRequestSchema }),
-  controller.updateMatrixLineItem
-);
-
-matricesRoutes.delete(
-  '/:id/line-items/:lineItemId',
-  authenticate,
-  authorize('matrix_line_items.delete'),
-  validate({ params: IdParamSchema }),
-  controller.removeMatrixLineItem
-);
-
 // ── Matrix Attachments ──
 
 matricesRoutes.get(
@@ -127,14 +80,4 @@ matricesRoutes.delete(
   authorize('matrix_attachments.delete'),
   validate({ params: IdParamSchema }),
   controller.removeMatrixAttachment
-);
-
-// ── Matrix State History ──
-
-matricesRoutes.get(
-  '/:id/history',
-  authenticate,
-  authorize('offer_matrices.read'),
-  validate({ params: IdParamSchema, query: ListMatrixStateHistoryQuerySchema }),
-  controller.listMatrixStateHistory
 );

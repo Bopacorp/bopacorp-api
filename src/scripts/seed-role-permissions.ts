@@ -42,12 +42,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'offer_matrices.create',
     'offer_matrices.read',
     'offer_matrices.update',
-    'offer_matrices.change_state',
-
-    'matrix_line_items.create',
-    'matrix_line_items.read',
-    'matrix_line_items.update',
-    'matrix_line_items.delete',
+    'offer_matrices.delete',
 
     'matrix_attachments.create',
     'matrix_attachments.read',
@@ -91,9 +86,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document_types.read',
 
     'offer_matrices.read',
-    'offer_matrices.change_state',
-
-    'matrix_line_items.read',
 
     'matrix_attachments.read',
 
@@ -143,9 +135,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document_types.read',
 
     'offer_matrices.read',
-    'offer_matrices.change_state',
-
-    'matrix_line_items.read',
 
     'matrix_attachments.read',
 
