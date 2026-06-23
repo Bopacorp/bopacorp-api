@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
+// biome-ignore lint/complexity/useLiteralKeys: process.env requires bracket access (index signature)
 const connectionString = process.env['DIRECT_URL'] || process.env['DATABASE_URL'];
 
 if (!connectionString) {

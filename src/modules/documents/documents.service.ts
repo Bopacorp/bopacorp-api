@@ -296,7 +296,7 @@ export async function getDocumentById(id: string, user?: NonNullable<Express.Req
     throw new NotFoundError('Negotiation document', id);
   }
 
-  if (user && user.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
+  if (user?.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
     throw new ForbiddenError('You can only access documents from your own negotiations');
   }
 
@@ -478,7 +478,7 @@ export async function downloadDocument(id: string, user?: NonNullable<Express.Re
     throw new NotFoundError('Negotiation document', id);
   }
 
-  if (user && user.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
+  if (user?.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
     throw new ForbiddenError('You can only access documents from your own negotiations');
   }
 
