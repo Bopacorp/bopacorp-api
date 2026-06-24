@@ -12,7 +12,9 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 
   if (authHeader?.startsWith('Bearer ')) {
     token = authHeader.slice(7);
+    // biome-ignore lint/complexity/useLiteralKeys: Express query uses index signature
   } else if (req.query['token'] && typeof req.query['token'] === 'string') {
+    // biome-ignore lint/complexity/useLiteralKeys: Express query uses index signature
     token = req.query['token'];
   } else {
     throw new UnauthorizedError('Missing or invalid authorization header');

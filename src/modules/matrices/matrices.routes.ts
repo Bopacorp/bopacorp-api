@@ -8,7 +8,7 @@ import {
 import { authenticate } from '@shared/middleware/authenticate.js';
 import { authorize } from '@shared/middleware/authorize.js';
 import { validate } from '@shared/middleware/validate.js';
-import { IdParamSchema } from '@shared/schemas/params.js';
+import { IdParamSchema, IdWithSubResourceParamSchema } from '@shared/schemas/params.js';
 import { Router } from 'express';
 import * as controller from './matrices.controller.js';
 
@@ -78,6 +78,7 @@ matricesRoutes.get(
   '/:id/attachments/:attachmentId/download',
   authenticate,
   authorize('matrix_attachments.read'),
+  validate({ params: IdWithSubResourceParamSchema }),
   controller.downloadMatrixAttachment
 );
 
@@ -85,6 +86,6 @@ matricesRoutes.delete(
   '/:id/attachments/:attachmentId',
   authenticate,
   authorize('matrix_attachments.delete'),
-  validate({ params: IdParamSchema }),
+  validate({ params: IdWithSubResourceParamSchema }),
   controller.removeMatrixAttachment
 );
