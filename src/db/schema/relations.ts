@@ -43,12 +43,7 @@ import {
 } from './crm.js';
 import { documentStateHistory, documentTypes, negotiationDocuments } from './documents.js';
 import { candidateResumes, candidates, jobApplications, jobVacancies } from './employability.js';
-import {
-  matrixAttachments,
-  matrixLineItems,
-  matrixStateHistory,
-  offerMatrices,
-} from './matrices.js';
+import { matrixAttachments, offerMatrices } from './matrices.js';
 import { notifications } from './notifications.js';
 import { reportExports, salesObjectives } from './reports.js';
 
@@ -100,9 +95,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   verifiedVisits: many(visits, { relationName: 'verifiedBy' }),
   stateHistoryChanges: many(negotiationStateHistory, { relationName: 'changedBy' }),
   createdMatrices: many(offerMatrices, { relationName: 'matrixCreator' }),
-  approvedMatrices: many(offerMatrices, { relationName: 'matrixApprover' }),
   matrixAttachments: many(matrixAttachments),
-  matrixStateChanges: many(matrixStateHistory),
   uploadedDocuments: many(negotiationDocuments, { relationName: 'documentUploader' }),
   reviewedDocuments: many(negotiationDocuments, { relationName: 'documentReviewer' }),
   documentStateChanges: many(documentStateHistory),
@@ -186,7 +179,6 @@ export const catalogItemsRelations = relations(catalogItems, ({ one, many }) => 
   legalConditions: one(legalConditions),
   temporalConditions: one(temporalConditions),
   contactRequests: many(contactRequests),
-  matrixLineItems: many(matrixLineItems),
 }));
 
 export const voiceDetailsRelations = relations(voiceDetails, ({ one }) => ({
@@ -498,25 +490,7 @@ export const offerMatricesRelations = relations(offerMatrices, ({ one, many }) =
     references: [users.id],
     relationName: 'matrixCreator',
   }),
-  approvedBy: one(users, {
-    fields: [offerMatrices.approvedBy],
-    references: [users.id],
-    relationName: 'matrixApprover',
-  }),
-  lineItems: many(matrixLineItems),
   attachments: many(matrixAttachments),
-  stateHistory: many(matrixStateHistory),
-}));
-
-export const matrixLineItemsRelations = relations(matrixLineItems, ({ one }) => ({
-  matrix: one(offerMatrices, {
-    fields: [matrixLineItems.matrixId],
-    references: [offerMatrices.id],
-  }),
-  item: one(catalogItems, {
-    fields: [matrixLineItems.itemId],
-    references: [catalogItems.id],
-  }),
 }));
 
 export const matrixAttachmentsRelations = relations(matrixAttachments, ({ one }) => ({
@@ -526,17 +500,6 @@ export const matrixAttachmentsRelations = relations(matrixAttachments, ({ one })
   }),
   uploadedBy: one(users, {
     fields: [matrixAttachments.uploadedBy],
-    references: [users.id],
-  }),
-}));
-
-export const matrixStateHistoryRelations = relations(matrixStateHistory, ({ one }) => ({
-  matrix: one(offerMatrices, {
-    fields: [matrixStateHistory.matrixId],
-    references: [offerMatrices.id],
-  }),
-  changedBy: one(users, {
-    fields: [matrixStateHistory.changedBy],
     references: [users.id],
   }),
 }));
