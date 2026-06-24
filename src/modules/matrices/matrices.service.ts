@@ -5,10 +5,13 @@ import type {
   ListOfferMatricesQuery,
   UpdateOfferMatrixRequest,
 } from '@bopacorp/shared/matrices';
+import { env } from '@config/env.js';
 import { users } from '@db/schema/auth.js';
 import { negotiations } from '@db/schema/crm.js';
 import { matrixAttachments, offerMatrices } from '@db/schema/matrices.js';
 import { db } from '@lib/db.js';
+import type { EncryptionMetadata } from '@lib/encryption.js';
+import { downloadFile } from '@lib/storage.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
 import { and, eq, ilike, isNull, type SQL, sql } from 'drizzle-orm';
@@ -275,6 +278,7 @@ export async function createMatrixAttachment(userId: string, data: CreateMatrixA
       fileSizeMb: data.fileSizeMb.toString(),
       storagePath: data.storagePath,
       mimeType: data.mimeType,
+      encryptionMetadata: data.encryptionMetadata,
     })
     .returning();
 
@@ -288,4 +292,29 @@ export async function createMatrixAttachment(userId: string, data: CreateMatrixA
 export async function removeMatrixAttachment(id: string) {
   await getMatrixAttachmentById(id);
   await db.delete(matrixAttachments).where(eq(matrixAttachments.id, id));
+}
+
+export async function downloadMatrixAttachment(attachmentId: string) {
+  const row = await db.query.matrixAttachments.findFirst({
+    where: eq(matrixAttachments.id, attachmentId),
+  });
+
+  if (!row) {
+    throw new NotFoundError('Matrix attachment', attachmentId);
+  }
+
+  const body = await downloadFile(row.storagePath, env.DOCUMENTS_STORAGE_BUCKET);
+  if (!body) {
+    throw new NotFoundError('Attachment file in storage', row.storagePath);
+  }
+
+  const rawBuffer = Buffer.from(await body.transformToByteArray());
+
+  if (row.encryptionMetadata) {
+    const { decryptBuffer } = await import('@lib/encryption.js');
+    const buffer = decryptBuffer(rawBuffer, row.encryptionMetadata as EncryptionMetadata);
+    return { buffer, filename: row.filename, mimeType: row.mimeType };
+  }
+
+  return { buffer: rawBuffer, filename: row.filename, mimeType: row.mimeType };
 }
