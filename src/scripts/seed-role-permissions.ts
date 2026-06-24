@@ -36,6 +36,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
     'negotiation_documents.create',
     'negotiation_documents.read',
+    'negotiation_documents.delete',
 
     'document_types.read',
 

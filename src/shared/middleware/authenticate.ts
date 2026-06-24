@@ -7,13 +7,16 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
+  let token = '';
   const authHeader = req.headers.authorization;
 
-  if (!authHeader?.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else if (req.query['token'] && typeof req.query['token'] === 'string') {
+    token = req.query['token'];
+  } else {
     throw new UnauthorizedError('Missing or invalid authorization header');
   }
-
-  const token = authHeader.slice(7);
 
   let payload: { sub: string; email: string; roles: string[]; permissions: string[] };
 
