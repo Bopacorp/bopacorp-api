@@ -6,8 +6,19 @@ import type {
 import { visits, visitTypes } from '@db/schema/crm.js';
 import { db } from '@lib/db.js';
 import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, ilike, or, sql } from 'drizzle-orm';
+import { type AnyColumn, and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { formatDateTime } from '../crm.helpers.js';
+
+function getVisitTypeSortColumn(sortBy?: string): AnyColumn {
+  switch (sortBy) {
+    case 'name':
+      return visitTypes.name;
+    case 'code':
+      return visitTypes.code;
+    default:
+      return visitTypes.createdAt;
+  }
+}
 
 export async function listVisitTypes(query: ListVisitTypesQuery) {
   const conditions = [];
@@ -32,7 +43,11 @@ export async function listVisitTypes(query: ListVisitTypesQuery) {
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(visitTypes.createdAt);
+    .orderBy(
+      query.sortOrder === 'desc'
+        ? desc(getVisitTypeSortColumn(query.sortBy))
+        : asc(getVisitTypeSortColumn(query.sortBy))
+    );
 
   return {
     data: rows.map((row) => ({
