@@ -59,6 +59,19 @@ export async function createMatrixAttachment(req: Request<{ id: string }>, res: 
   res.status(201).json({ success: true, data });
 }
 
+export async function downloadMatrixAttachment(
+  req: Request<{ id: string; attachmentId: string }>,
+  res: Response
+) {
+  const { buffer, filename, mimeType } = await service.downloadMatrixAttachment(
+    req.params.attachmentId
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Type', mimeType);
+  res.setHeader('Content-Length', buffer.length.toString());
+  res.send(buffer);
+}
+
 export async function removeMatrixAttachment(
   req: Request<{ id: string; attachmentId: string }>,
   res: Response

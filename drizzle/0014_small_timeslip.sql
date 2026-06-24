@@ -1,0 +1,1 @@
+ALTER TABLE "matrices"."matrix_attachments" ADD COLUMN "encryption_metadata" jsonb;

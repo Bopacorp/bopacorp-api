@@ -74,6 +74,13 @@ matricesRoutes.post(
   controller.createMatrixAttachment
 );
 
+matricesRoutes.get(
+  '/:id/attachments/:attachmentId/download',
+  authenticate,
+  authorize('matrix_attachments.read'),
+  controller.downloadMatrixAttachment
+);
+
 matricesRoutes.delete(
   '/:id/attachments/:attachmentId',
   authenticate,
