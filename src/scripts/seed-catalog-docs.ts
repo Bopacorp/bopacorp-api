@@ -3,7 +3,9 @@ import {
   benefitTypes,
   catalogItems,
   categories,
+  connectivityDetails,
   contractTypes,
+  digitalDetails,
   geoZones,
   itemTypes,
   segments,
@@ -41,6 +43,12 @@ async function upsertByCode<T extends { code: string; id: string }>(
 }
 
 async function seed() {
+  await db.delete(voiceDetails);
+  await db.delete(connectivityDetails);
+  await db.delete(digitalDetails);
+  await db.delete(catalogItems);
+  process.stdout.write('Old catalog records deleted.\n');
+
   const catDefs = [
     { name: 'Voz', description: 'Planes de voz movil corporativa', sortOrder: 1 },
     { name: 'Conectividad', description: 'Internet dedicado y fibra optica', sortOrder: 2 },
@@ -59,6 +67,8 @@ async function seed() {
   const catRows = await db.select().from(categories);
   const catByName = new Map(catRows.map((c) => [c.name, c]));
   const catVoz = required(catByName.get('Voz'), 'cat:Voz');
+  const catConectividad = required(catByName.get('Conectividad'), 'cat:Conectividad');
+  const catDigital = required(catByName.get('Servicios Digitales'), 'cat:Servicios Digitales');
 
   const segDefs = [
     { code: 'natural', name: 'RUC Natural', description: 'Persona natural, 1-2 lineas' },
@@ -273,12 +283,7 @@ async function seed() {
 
   const allPlans = [...naturalPlans, ...juridicoPlans];
 
-  const existingItems = await db.select({ name: catalogItems.name }).from(catalogItems);
-  const existingItemNames = new Set(existingItems.map((i) => i.name));
-
   for (const plan of allPlans) {
-    if (existingItemNames.has(plan.name)) continue;
-
     const segId = required(segMap.get(plan.segment), `seg:${plan.segment}`).id;
     const tierId = required(tierMap.get(plan.tier), `tier:${plan.tier}`).id;
 
@@ -310,6 +315,146 @@ async function seed() {
       hasUnlimitedWhatsapp: true,
       hasSocialNetworks: plan.hasSocialNetworks,
       includedRoamingGb: plan.includedRoamingGb,
+    });
+  }
+
+  const internetId = required(itMap.get('internet'), 'it:internet').id;
+  const digitalId = required(itMap.get('digital'), 'it:digital').id;
+  const juridicoSegId = required(segMap.get('juridico'), 'seg:juridico').id;
+
+  const connectivityPlans = [
+    {
+      name: 'Internet M Fibra Pro 300 Mbps',
+      description: 'Fibra optica simetrica 300 Mbps para empresas',
+      tier: 'pro',
+      price: '45.00',
+      bandwidthMbps: 300,
+      permanenceMonths: 24,
+    },
+    {
+      name: 'Internet M Fibra Pro 600 Mbps',
+      description: 'Fibra optica simetrica 600 Mbps para empresas',
+      tier: 'advanced',
+      price: '65.00',
+      bandwidthMbps: 600,
+      permanenceMonths: 24,
+    },
+    {
+      name: 'Internet M Fibra Pro 1.2 Gbps',
+      description: 'Fibra optica simetrica 1.2 Gbps para empresas',
+      tier: 'elite',
+      price: '95.00',
+      bandwidthMbps: 1200,
+      permanenceMonths: 24,
+    },
+    {
+      name: 'Starlink Estandar',
+      description: 'Internet satelital Starlink con antena estandar para pymes',
+      tier: 'pro',
+      price: '110.00',
+      bandwidthMbps: 100,
+      permanenceMonths: 12,
+    },
+    {
+      name: 'Starlink High Performance',
+      description: 'Internet satelital Starlink con antena de alto rendimiento',
+      tier: 'ultra',
+      price: '250.00',
+      bandwidthMbps: 220,
+      permanenceMonths: 12,
+    },
+  ];
+
+  for (const plan of connectivityPlans) {
+    const tierId = required(tierMap.get(plan.tier), `tier:${plan.tier}`).id;
+    const [inserted] = await db
+      .insert(catalogItems)
+      .values({
+        categoryId: catConectividad.id,
+        itemTypeId: internetId,
+        contractTypeId: postpaidId,
+        segmentId: juridicoSegId,
+        tierId,
+        name: plan.name,
+        description: plan.description,
+        price: plan.price,
+        isActive: true,
+        isPublished: true,
+        permanenceMonths: plan.permanenceMonths,
+      })
+      .returning();
+
+    await db.insert(connectivityDetails).values({
+      itemId: required(inserted, `insert:${plan.name}`).id,
+      bandwidthMbps: plan.bandwidthMbps.toString(),
+    });
+  }
+
+  const digitalServices = [
+    {
+      name: 'Amazon Prime Video',
+      description: 'Suscripcion a Amazon Prime Video incluida en planes seleccionados',
+      tier: 'pro',
+      price: '8.99',
+      provider: 'Amazon',
+      permanenceMonths: 12,
+    },
+    {
+      name: 'Antivirus Bitdefender',
+      description: 'Licencia antivirus con proteccion de archivos, bloqueo de apps y antirrobo',
+      tier: 'pro',
+      price: '5.99',
+      provider: 'Bitdefender',
+      permanenceMonths: 12,
+    },
+    {
+      name: 'Kit Emprendedor',
+      description: 'Cloud 250GB, soporte informatico, gestion redes sociales o pagina web',
+      tier: 'advanced',
+      price: '15.99',
+      provider: 'Movistar Empresas',
+      permanenceMonths: 12,
+    },
+    {
+      name: 'Cloud Empresarial 250 GB',
+      description: 'Almacenamiento en la nube 250 GB para respaldo empresarial',
+      tier: 'pro',
+      price: '9.99',
+      provider: 'Movistar Cloud',
+      permanenceMonths: 12,
+    },
+    {
+      name: 'Web + Community Manager',
+      description: 'Creacion de pagina web con tienda en linea y gestion de redes sociales',
+      tier: 'elite',
+      price: '29.99',
+      provider: 'Movistar Empresas',
+      permanenceMonths: 12,
+    },
+  ];
+
+  for (const svc of digitalServices) {
+    const tierId = required(tierMap.get(svc.tier), `tier:${svc.tier}`).id;
+    const [inserted] = await db
+      .insert(catalogItems)
+      .values({
+        categoryId: catDigital.id,
+        itemTypeId: digitalId,
+        contractTypeId: postpaidId,
+        segmentId: juridicoSegId,
+        tierId,
+        name: svc.name,
+        description: svc.description,
+        price: svc.price,
+        isActive: true,
+        isPublished: true,
+        permanenceMonths: svc.permanenceMonths,
+      })
+      .returning();
+
+    await db.insert(digitalDetails).values({
+      itemId: required(inserted, `insert:${svc.name}`).id,
+      provider: svc.provider,
     });
   }
 
