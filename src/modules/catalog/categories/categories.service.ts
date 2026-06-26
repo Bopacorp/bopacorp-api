@@ -128,6 +128,7 @@ export async function updateCategory(id: string, input: UpdateCategoryRequest) {
 
   if (input.parentId !== undefined) updateData.parentId = input.parentId;
   if (input.name !== undefined) updateData.name = input.name;
+  if (input.slug !== undefined) updateData.slug = input.slug;
   if (input.description !== undefined) updateData.description = input.description;
   if (input.sortOrder !== undefined) updateData.sortOrder = input.sortOrder;
   if (input.isActive !== undefined) updateData.isActive = input.isActive;

@@ -18,6 +18,7 @@
     "db:studio": "drizzle-kit studio",
     "db:migrate:prod": "node dist/db/migrate.js",
     "seed:cms:about": "tsx src/scripts/seed-cms-about.ts",
+    "seed:cms:site-config": "tsx src/scripts/seed-cms-site-config.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "prepare": "husky"
@@ -45,7 +46,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1063.0",
     "@aws-sdk/lib-storage": "^3.1063.0",
-    "@bopacorp/shared": "^0.2.34",
+    "@bopacorp/shared": "^0.2.38",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

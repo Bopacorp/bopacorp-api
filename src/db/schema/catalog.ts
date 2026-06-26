@@ -100,6 +100,7 @@ export const categories = catalogSchema.table(
       onDelete: 'set null',
     }),
     name: varchar({ length: 100 }).notNull(),
+    slug: varchar({ length: 120 }).notNull().unique(),
     description: varchar({ length: 255 }),
     sortOrder: integer('sort_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),

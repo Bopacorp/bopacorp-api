@@ -50,10 +50,16 @@ async function seed() {
   process.stdout.write('Old catalog records deleted.\n');
 
   const catDefs = [
-    { name: 'Voz', description: 'Planes de voz movil corporativa', sortOrder: 1 },
-    { name: 'Conectividad', description: 'Internet dedicado y fibra optica', sortOrder: 2 },
+    { name: 'Voz', slug: 'voz', description: 'Planes de voz movil corporativa', sortOrder: 1 },
+    {
+      name: 'Conectividad',
+      slug: 'conectividad',
+      description: 'Internet dedicado y fibra optica',
+      sortOrder: 2,
+    },
     {
       name: 'Servicios Digitales',
+      slug: 'servicios-digitales',
       description: 'Soluciones cloud, seguridad y rastreo',
       sortOrder: 3,
     },
@@ -63,6 +69,9 @@ async function seed() {
   const newCats = catDefs.filter((c) => !existingCatNames.has(c.name));
   if (newCats.length > 0) {
     await db.insert(categories).values(newCats);
+  }
+  for (const def of catDefs) {
+    await db.update(categories).set({ slug: def.slug }).where(eq(categories.name, def.name));
   }
   const catRows = await db.select().from(categories);
   const catByName = new Map(catRows.map((c) => [c.name, c]));

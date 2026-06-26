@@ -26,6 +26,9 @@ async function queryPublicCatalogItems(filters?: ListPublicCatalogQuery) {
   if (filters?.categoryId) {
     conditions.push(eq(catalogItems.categoryId, filters.categoryId));
   }
+  if (filters?.categorySlug) {
+    conditions.push(eq(categories.slug, filters.categorySlug));
+  }
   if (filters?.segmentId) {
     conditions.push(eq(catalogItems.segmentId, filters.segmentId));
   }
@@ -44,7 +47,7 @@ async function queryPublicCatalogItems(filters?: ListPublicCatalogQuery) {
       price: catalogItems.price,
       imagePath: catalogItems.imagePath,
       permanenceMonths: catalogItems.permanenceMonths,
-      category: { id: categories.id, name: categories.name },
+      category: { id: categories.id, name: categories.name, slug: categories.slug },
       itemType: { id: itemTypes.id, code: itemTypes.code, name: itemTypes.name },
       contractType: { id: contractTypes.id, code: contractTypes.code, name: contractTypes.name },
       segment: { id: segments.id, code: segments.code, name: segments.name },
@@ -195,7 +198,7 @@ function toVoiceDetails(detail: NonNullable<CatalogItemRow['voiceDetails']>) {
 
 export async function listPublicCategories() {
   const rows = await db
-    .selectDistinct({ id: categories.id, name: categories.name })
+    .selectDistinct({ id: categories.id, name: categories.name, slug: categories.slug })
     .from(categories)
     .innerJoin(catalogItems, eq(catalogItems.categoryId, categories.id))
     .where(
