@@ -1,3 +1,4 @@
+import type { ListPublicCatalogQuery } from '@bopacorp/shared';
 import {
   catalogItems,
   categories,
@@ -13,11 +14,28 @@ import {
   voiceDetails,
 } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte, type SQL } from 'drizzle-orm';
 
-const NATURAL_SEGMENT_CODE = 'natural';
+async function queryPublicCatalogItems(filters?: ListPublicCatalogQuery) {
+  const conditions: SQL[] = [
+    eq(catalogItems.isActive, true),
+    eq(catalogItems.isPublished, true),
+    isNull(catalogItems.deletedAt),
+  ];
 
-async function queryPublicCatalogItems() {
+  if (filters?.categoryId) {
+    conditions.push(eq(catalogItems.categoryId, filters.categoryId));
+  }
+  if (filters?.segmentId) {
+    conditions.push(eq(catalogItems.segmentId, filters.segmentId));
+  }
+  if (filters?.minPrice !== undefined) {
+    conditions.push(gte(catalogItems.price, filters.minPrice.toString()));
+  }
+  if (filters?.maxPrice !== undefined) {
+    conditions.push(lte(catalogItems.price, filters.maxPrice.toString()));
+  }
+
   return db
     .select({
       id: catalogItems.id,
@@ -78,21 +96,14 @@ async function queryPublicCatalogItems() {
     .leftJoin(digitalDetails, eq(catalogItems.id, digitalDetails.itemId))
     .leftJoin(roamingDetails, eq(catalogItems.id, roamingDetails.itemId))
     .leftJoin(deviceDetails, eq(catalogItems.id, deviceDetails.itemId))
-    .where(
-      and(
-        eq(segments.code, NATURAL_SEGMENT_CODE),
-        eq(catalogItems.isActive, true),
-        eq(catalogItems.isPublished, true),
-        isNull(catalogItems.deletedAt)
-      )
-    )
+    .where(and(...conditions))
     .orderBy(asc(catalogItems.price));
 }
 
 type CatalogItemRow = Awaited<ReturnType<typeof queryPublicCatalogItems>>[number];
 
-export async function listPublicCatalogItems() {
-  const rows = await queryPublicCatalogItems();
+export async function listPublicCatalogItems(filters?: ListPublicCatalogQuery) {
+  const rows = await queryPublicCatalogItems(filters);
 
   const itemIds = rows.map((row) => row.id);
   const benefits =
@@ -180,6 +191,40 @@ function toVoiceDetails(detail: NonNullable<CatalogItemRow['voiceDetails']>) {
     hasSocialNetworks: detail.hasSocialNetworks,
     includedRoamingGb: Number.parseFloat(detail.includedRoamingGb),
   };
+}
+
+export async function listPublicCategories() {
+  const rows = await db
+    .selectDistinct({ id: categories.id, name: categories.name })
+    .from(categories)
+    .innerJoin(catalogItems, eq(catalogItems.categoryId, categories.id))
+    .where(
+      and(
+        eq(catalogItems.isActive, true),
+        eq(catalogItems.isPublished, true),
+        isNull(catalogItems.deletedAt)
+      )
+    )
+    .orderBy(asc(categories.name));
+
+  return rows;
+}
+
+export async function listPublicSegments() {
+  const rows = await db
+    .selectDistinct({ id: segments.id, code: segments.code, name: segments.name })
+    .from(segments)
+    .innerJoin(catalogItems, eq(catalogItems.segmentId, segments.id))
+    .where(
+      and(
+        eq(catalogItems.isActive, true),
+        eq(catalogItems.isPublished, true),
+        isNull(catalogItems.deletedAt)
+      )
+    )
+    .orderBy(asc(segments.name));
+
+  return rows;
 }
 
 export type { CatalogItemRow as PublicCatalogItem };

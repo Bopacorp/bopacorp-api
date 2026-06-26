@@ -1,3 +1,5 @@
+import { ListPublicCatalogQuerySchema } from '@bopacorp/shared';
+import { validate } from '@shared/middleware/validate.js';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import * as controller from './public-catalog.controller.js';
@@ -15,4 +17,13 @@ const publicReadRateLimit = rateLimit({
   },
 });
 
-publicCatalogRoutes.get('/items', publicReadRateLimit, controller.listItems);
+publicCatalogRoutes.get(
+  '/items',
+  publicReadRateLimit,
+  validate({ query: ListPublicCatalogQuerySchema }),
+  controller.listItems
+);
+
+publicCatalogRoutes.get('/categories', publicReadRateLimit, controller.listCategories);
+
+publicCatalogRoutes.get('/segments', publicReadRateLimit, controller.listSegments);
