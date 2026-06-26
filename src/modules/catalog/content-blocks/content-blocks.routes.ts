@@ -18,6 +18,8 @@ contentBlocksRoutes.get(
   controller.listContentBlocks
 );
 
+contentBlocksRoutes.get('/sections', authorize('content_blocks.read'), controller.listSections);
+
 contentBlocksRoutes.get(
   '/:id',
   authorize('content_blocks.read'),

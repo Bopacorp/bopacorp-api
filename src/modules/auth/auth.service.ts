@@ -166,7 +166,7 @@ export const authService = {
     });
 
     if (!user) {
-      throw new UnauthorizedError('Invalid credentials');
+      throw new HttpError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
     }
 
     if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
@@ -176,8 +176,10 @@ export const authService = {
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       });
-      throw new UnauthorizedError(
-        'Account temporarily locked due to failed login attempts. Please try again later.'
+      throw new HttpError(
+        403,
+        'Account temporarily locked due to failed login attempts. Please try again later.',
+        'ACCOUNT_LOCKED'
       );
     }
 
@@ -216,7 +218,7 @@ export const authService = {
         userAgent: data.userAgent,
       });
 
-      throw new UnauthorizedError('Invalid credentials');
+      throw new HttpError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
     }
 
     if (!user.isActive) {
@@ -226,7 +228,7 @@ export const authService = {
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       });
-      throw new UnauthorizedError('Account is deactivated');
+      throw new HttpError(403, 'Account is deactivated', 'ACCOUNT_DISABLED');
     }
 
     await db
