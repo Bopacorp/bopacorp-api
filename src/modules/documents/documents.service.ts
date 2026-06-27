@@ -15,6 +15,7 @@ import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/s
 import { db } from '@lib/db.js';
 import { decryptBuffer } from '@lib/encryption.js';
 import { downloadFile } from '@lib/storage.js';
+import { createNotification } from '@modules/notifications/notifications.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
 import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
@@ -459,6 +460,23 @@ export async function changeDocumentState(
     changedBy: userId,
     notes: data.coordinatorMessage,
   });
+
+  if (newState === 'ACCEPTED' || newState === 'REJECTED') {
+    const negotiation = await db.query.negotiations.findFirst({
+      where: eq(negotiations.id, document.negotiation.id),
+    });
+
+    if (negotiation) {
+      const stateLabel = newState === 'ACCEPTED' ? 'aprobado' : 'rechazado';
+      await createNotification({
+        recipientId: negotiation.advisorId,
+        title: `Documento ${stateLabel}`,
+        message: `${document.documentType.name} para ${document.negotiation.client.businessName} fue ${stateLabel}.${data.coordinatorMessage ? ` ${data.coordinatorMessage}` : ''}`,
+        referenceType: 'document',
+        referenceId: id,
+      });
+    }
+  }
 
   return getDocumentById(id);
 }

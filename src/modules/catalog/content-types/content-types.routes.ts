@@ -1,5 +1,6 @@
 import {
   CreateContentTypeRequestSchema,
+  ListContentTypesQuerySchema,
   UpdateContentTypeRequestSchema,
 } from '@bopacorp/shared/catalog';
 import { authorize } from '@shared/middleware/authorize.js';
@@ -10,7 +11,12 @@ import * as controller from './content-types.controller.js';
 
 export const contentTypesRoutes = Router();
 
-contentTypesRoutes.get('/', authorize('content_types.read'), controller.list);
+contentTypesRoutes.get(
+  '/',
+  authorize('content_types.read'),
+  validate({ query: ListContentTypesQuerySchema }),
+  controller.list
+);
 
 contentTypesRoutes.get(
   '/:id',

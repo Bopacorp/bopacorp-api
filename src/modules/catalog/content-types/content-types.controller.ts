@@ -1,8 +1,10 @@
+import type { ListContentTypesQuery } from '@bopacorp/shared/catalog';
 import type { Request, Response } from 'express';
 import * as service from './content-types.service.js';
 
-export async function list(_req: Request, res: Response) {
-  const data = await service.listContentTypes();
+export async function list(req: Request, res: Response) {
+  const query = req.query as unknown as ListContentTypesQuery;
+  const data = await service.listContentTypes(query);
   res.json({ success: true, data });
 }
 

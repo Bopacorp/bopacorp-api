@@ -14,6 +14,7 @@ import {
   negotiations,
 } from '@db/schema/crm.js';
 import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/schema/documents.js';
+import { offerMatrices } from '@db/schema/matrices.js';
 import { salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { deleteFile } from '@lib/storage.js';
@@ -258,6 +259,11 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
     newStateId: resolvedStateId,
     changedBy: userId,
     notes: 'Initial state',
+  });
+
+  await db.insert(offerMatrices).values({
+    negotiationId: row.id,
+    creatorId: userId,
   });
 
   return getNegotiationById(row.id);

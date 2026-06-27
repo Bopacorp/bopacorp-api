@@ -1,4 +1,4 @@
-import { and, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 
 export function buildLookupListConditions(
@@ -18,6 +18,16 @@ export function buildLookupListConditions(
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+export function getLookupOrderBy(
+  cols: { code: AnyPgColumn; name: AnyPgColumn },
+  sortBy?: string,
+  sortOrder?: string
+) {
+  const map: Record<string, AnyPgColumn> = { code: cols.code, name: cols.name };
+  const column = (sortBy && map[sortBy]) || cols.code;
+  return sortOrder === 'desc' ? desc(column) : asc(column);
 }
 
 export function isValidImageBody(body: string | null | undefined): boolean {
