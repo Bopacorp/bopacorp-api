@@ -4,7 +4,8 @@ import type {
   ListNegotiationsQuery,
   UpdateNegotiationRequest,
 } from '@bopacorp/shared/crm';
-import { users } from '@db/schema/auth.js';
+import { env } from '@config/env.js';
+import { roles, userRoles, users } from '@db/schema/auth.js';
 import { employees, profiles } from '@db/schema/core.js';
 import {
   businessClients,
@@ -12,10 +13,22 @@ import {
   negotiationStates,
   negotiations,
 } from '@db/schema/crm.js';
+import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/schema/documents.js';
+import { offerMatrices } from '@db/schema/matrices.js';
+import { salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
-import { NotFoundError } from '@shared/errors/http-error.js';
+import { deleteFile } from '@lib/storage.js';
+import { uploadEncryptedDocument } from '@modules/document-uploads/document-uploads.service.js';
+import { createNotification } from '@modules/notifications/notifications.service.js';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '@shared/errors/http-error.js';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
 import type { AnyColumn } from 'drizzle-orm';
-import { and, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { formatDateTime, getOrderBy } from '../crm.helpers.js';
 
 function getSortColumn(sortBy?: string): AnyColumn {
@@ -32,7 +45,17 @@ export async function listNegotiations(
   query: ListNegotiationsQuery,
   user: NonNullable<Express.Request['user']>
 ) {
-  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+  let advisorIds: string[] | undefined;
+  if (user.roles.includes('advisor')) {
+    advisorIds = [user.id];
+  } else if (user.roles.includes('supervisor')) {
+    advisorIds = await getSupervisedAdvisorIds(user.id);
+    if (query.advisorId) {
+      advisorIds = advisorIds.filter((id) => id === query.advisorId);
+    }
+  } else if (query.advisorId) {
+    advisorIds = [query.advisorId];
+  }
 
   const conditions = [];
   conditions.push(isNull(negotiations.deletedAt));
@@ -45,12 +68,29 @@ export async function listNegotiations(
     conditions.push(eq(negotiations.clientId, query.clientId));
   }
 
-  if (advisorId) {
-    conditions.push(eq(negotiations.advisorId, advisorId));
+  if (advisorIds && advisorIds.length > 0) {
+    conditions.push(inArray(negotiations.advisorId, advisorIds));
   }
 
   if (query.stateId) {
     conditions.push(eq(negotiations.stateId, query.stateId));
+  }
+
+  if (query.tierCode) {
+    const [target] = await db
+      .select({ minBilling: salesTargets.minBilling, maxBilling: salesTargets.maxBilling })
+      .from(salesTargets)
+      .where(eq(salesTargets.tierCode, query.tierCode))
+      .limit(1);
+
+    if (target) {
+      conditions.push(gte(businessClients.currentMonthlyBilling, target.minBilling));
+      if (target.maxBilling !== null) {
+        conditions.push(lte(businessClients.currentMonthlyBilling, target.maxBilling));
+      }
+    } else {
+      conditions.push(sql`false`);
+    }
   }
 
   if (query.search) {
@@ -186,12 +226,27 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
     throw new NotFoundError('Advisor', data.advisorId);
   }
 
-  const state = await db.query.negotiationStates.findFirst({
-    where: eq(negotiationStates.id, data.stateId),
-  });
+  let resolvedStateId: string;
 
-  if (!state) {
-    throw new NotFoundError('Negotiation state', data.stateId);
+  if (data.stateId) {
+    const state = await db.query.negotiationStates.findFirst({
+      where: eq(negotiationStates.id, data.stateId),
+    });
+    if (!state) {
+      throw new NotFoundError('Negotiation state', data.stateId);
+    }
+    resolvedStateId = state.id;
+  } else {
+    const [firstState] = await db
+      .select({ id: negotiationStates.id })
+      .from(negotiationStates)
+      .where(eq(negotiationStates.isActive, true))
+      .orderBy(asc(negotiationStates.position))
+      .limit(1);
+    if (!firstState) {
+      throw new NotFoundError('Negotiation state', 'default');
+    }
+    resolvedStateId = firstState.id;
   }
 
   const [row] = await db
@@ -199,7 +254,7 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
     .values({
       clientId: data.clientId,
       advisorId: data.advisorId,
-      stateId: data.stateId,
+      stateId: resolvedStateId,
       startDate: data.startDate ?? new Date().toISOString().slice(0, 10),
       estimatedCloseDate: data.estimatedCloseDate ?? null,
       observations: data.observations,
@@ -213,9 +268,14 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
 
   await db.insert(negotiationStateHistory).values({
     negotiationId: row.id,
-    newStateId: data.stateId,
+    newStateId: resolvedStateId,
     changedBy: userId,
     notes: 'Initial state',
+  });
+
+  await db.insert(offerMatrices).values({
+    negotiationId: row.id,
+    creatorId: userId,
   });
 
   return getNegotiationById(row.id);
@@ -348,4 +408,160 @@ export async function getNegotiationHistory(id: string) {
     notes: h.notes,
     createdAt: formatDateTime(h.createdAt),
   }));
+}
+
+export async function closeWithDocuments(
+  negotiationId: string,
+  user: NonNullable<Express.Request['user']>,
+  files: Express.Multer.File[],
+  documentTypeIds: string[],
+  notes?: string
+) {
+  if (files.length !== documentTypeIds.length) {
+    throw new BadRequestError('Each file must have a corresponding document type ID');
+  }
+
+  const negotiation = await getNegotiationById(negotiationId);
+
+  if (user.roles.includes('advisor') && negotiation.advisor.id !== user.id) {
+    throw new ForbiddenError('You can only close your own negotiations');
+  }
+
+  const closingState = await db.query.negotiationStates.findFirst({
+    where: eq(negotiationStates.code, 'closing'),
+  });
+  if (!closingState) {
+    throw new NotFoundError('Negotiation state', 'closing');
+  }
+
+  if (negotiation.state.id === closingState.id) {
+    throw new ConflictError('Negotiation is already in closing state');
+  }
+
+  const requestedTypes = await db
+    .select({ id: documentTypes.id, code: documentTypes.code, name: documentTypes.name })
+    .from(documentTypes)
+    .where(inArray(documentTypes.id, documentTypeIds));
+
+  if (requestedTypes.length !== new Set(documentTypeIds).size) {
+    throw new BadRequestError('One or more document type IDs are invalid');
+  }
+
+  const mandatoryTypes = await db
+    .select({ id: documentTypes.id, code: documentTypes.code, name: documentTypes.name })
+    .from(documentTypes)
+    .where(and(eq(documentTypes.isMandatory, true), eq(documentTypes.isActive, true)));
+
+  const existingDocs = await db
+    .select({ documentTypeId: negotiationDocuments.documentTypeId })
+    .from(negotiationDocuments)
+    .where(
+      and(
+        eq(negotiationDocuments.negotiationId, negotiationId),
+        isNull(negotiationDocuments.deletedAt)
+      )
+    );
+
+  const coveredTypeIds = new Set([
+    ...existingDocs.map((d) => d.documentTypeId),
+    ...documentTypeIds,
+  ]);
+
+  const missingTypes = mandatoryTypes.filter((t) => !coveredTypeIds.has(t.id));
+  if (missingTypes.length > 0) {
+    const names = missingTypes.map((t) => t.name).join(', ');
+    throw new BadRequestError(`Missing mandatory documents: ${names}`);
+  }
+
+  const uploadResults: Awaited<ReturnType<typeof uploadEncryptedDocument>>[] = [];
+  const uploadedPaths: string[] = [];
+
+  try {
+    for (const file of files) {
+      const result = await uploadEncryptedDocument(file, user.id);
+      uploadResults.push(result);
+      uploadedPaths.push(result.storagePath);
+    }
+  } catch (error) {
+    await Promise.allSettled(
+      uploadedPaths.map((path) => deleteFile(path, env.DOCUMENTS_STORAGE_BUCKET))
+    );
+    throw error;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .select({ id: negotiations.id })
+        .from(negotiations)
+        .where(eq(negotiations.id, negotiationId))
+        .for('update');
+
+      for (let i = 0; i < uploadResults.length; i++) {
+        const upload = uploadResults[i];
+        const typeId = documentTypeIds[i];
+        if (!upload || !typeId) continue;
+
+        const [doc] = await tx
+          .insert(negotiationDocuments)
+          .values({
+            negotiationId,
+            documentTypeId: typeId,
+            uploadedBy: user.id,
+            filename: upload.filename,
+            fileExtension: upload.fileExtension,
+            fileSizeMb: upload.fileSizeMb.toString(),
+            storagePath: upload.storagePath,
+            mimeType: upload.mimeType,
+            encryptionMetadata: upload.encryptionMetadata,
+          })
+          .returning({ id: negotiationDocuments.id });
+
+        if (doc) {
+          await tx.insert(documentStateHistory).values({
+            documentId: doc.id,
+            newState: 'PENDING_APPROVAL',
+            changedBy: user.id,
+            notes: 'Document uploaded',
+          });
+        }
+      }
+
+      await tx
+        .update(negotiations)
+        .set({ stateId: closingState.id, updatedAt: new Date() })
+        .where(eq(negotiations.id, negotiationId));
+
+      await tx.insert(negotiationStateHistory).values({
+        negotiationId,
+        previousStateId: negotiation.state.id,
+        newStateId: closingState.id,
+        changedBy: user.id,
+        notes,
+      });
+    });
+  } catch (error) {
+    await Promise.allSettled(
+      uploadedPaths.map((path) => deleteFile(path, env.DOCUMENTS_STORAGE_BUCKET))
+    );
+    throw error;
+  }
+
+  const coordinators = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(and(eq(roles.slug, 'coordinator'), eq(userRoles.isActive, true)));
+
+  for (const coord of coordinators) {
+    await createNotification({
+      recipientId: coord.userId,
+      title: 'Documentos por revisar',
+      message: `${negotiation.client.businessName} - ${files.length} documento(s)`,
+      referenceType: 'negotiation',
+      referenceId: negotiationId,
+    });
+  }
+
+  return getNegotiationById(negotiationId);
 }

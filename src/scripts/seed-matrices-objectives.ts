@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { roles, userRoles } from '@db/schema/auth.js';
 import { negotiationStates, negotiations } from '@db/schema/crm.js';
 import { offerMatrices } from '@db/schema/matrices.js';
-import { salesObjectives } from '@db/schema/reports.js';
+import { salesTargets } from '@db/schema/reports.js';
 import { closeDb, db } from '@lib/db.js';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
@@ -105,35 +105,42 @@ async function seed() {
 
   process.stdout.write(`Created ${matricesCreated} offer matrices\n`);
 
-  const objectiveDefs = advisorIds.map((advisorId, i) => ({
-    createdBy: managerId,
-    advisorId,
-    targetSalesAmount: (5000 + i * 1500).toFixed(2),
-    targetClosedDeals: 3 + (i % 3),
-    periodStart: '2026-06-01',
-    periodEnd: '2026-06-30',
-  }));
-
-  objectiveDefs.push(
-    ...advisorIds.slice(0, 3).map((advisorId, i) => ({
+  const targetDefs = [
+    {
       createdBy: managerId,
-      advisorId,
-      targetSalesAmount: (4500 + i * 1000).toFixed(2),
-      targetClosedDeals: 2 + i,
-      periodStart: '2026-07-01',
-      periodEnd: '2026-07-31',
-    }))
-  );
+      tierCode: 'ONE_SHOT',
+      tierLabel: 'One Shot',
+      minBilling: '850.00',
+      maxBilling: null,
+      minCloses: 2,
+    },
+    {
+      createdBy: managerId,
+      tierCode: 'MEDIANO',
+      tierLabel: 'Mediano',
+      minBilling: '500.00',
+      maxBilling: '849.99',
+      minCloses: 3,
+    },
+    {
+      createdBy: managerId,
+      tierCode: 'SMALL',
+      tierLabel: 'Small',
+      minBilling: '0.00',
+      maxBilling: '499.99',
+      minCloses: 4,
+    },
+  ];
 
-  const insertedObjectives = await db
-    .insert(salesObjectives)
-    .values(objectiveDefs)
+  const insertedTargets = await db
+    .insert(salesTargets)
+    .values(targetDefs)
     .onConflictDoNothing()
     .returning();
 
-  process.stdout.write(`Created ${insertedObjectives.length} sales objectives\n`);
+  process.stdout.write(`Created ${insertedTargets.length} sales targets\n`);
 
-  process.stdout.write('Seed matrices + objectives completed.\n');
+  process.stdout.write('Seed matrices + targets completed.\n');
   await closeDb();
 }
 

@@ -469,39 +469,27 @@ async function seed() {
 
   const docTypeDefs = [
     {
-      code: 'provisional-ruc',
-      name: 'RUC Provisional',
-      description: 'Registro Unico de Contribuyentes provisional',
+      code: 'ruc',
+      name: 'RUC',
+      description: 'Registro Unico de Contribuyentes',
       isMandatory: true,
     },
     {
       code: 'initial-proposal',
       name: 'Propuesta Inicial',
       description: 'Documento con la oferta comercial inicial',
-      isMandatory: false,
+      isMandatory: true,
     },
     {
       code: 'visit-report',
       name: 'Informe de Visita',
       description: 'Reporte de la visita realizada al cliente',
-      isMandatory: false,
+      isMandatory: true,
     },
     {
       code: 'final-contract',
       name: 'Contrato Final',
       description: 'Contrato firmado por ambas partes',
-      isMandatory: true,
-    },
-    {
-      code: 'cedula-representante',
-      name: 'Cedula del Representante Legal',
-      description: 'Documento de identidad del representante legal',
-      isMandatory: true,
-    },
-    {
-      code: 'nombramiento',
-      name: 'Nombramiento',
-      description: 'Nombramiento del representante legal inscrito',
       isMandatory: true,
     },
   ];

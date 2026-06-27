@@ -1,11 +1,21 @@
-import type { CreateContentTypeRequest, UpdateContentTypeRequest } from '@bopacorp/shared/catalog';
+import type {
+  CreateContentTypeRequest,
+  ListContentTypesQuery,
+  UpdateContentTypeRequest,
+} from '@bopacorp/shared/catalog';
 import { contentTypes } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { eq } from 'drizzle-orm';
+import { buildLookupListConditions, getLookupOrderBy } from '../catalog.helpers.js';
 
-export async function listContentTypes() {
-  return db.select().from(contentTypes).orderBy(contentTypes.code);
+export async function listContentTypes(query: ListContentTypesQuery) {
+  const where = buildLookupListConditions(query, contentTypes);
+  return db
+    .select()
+    .from(contentTypes)
+    .where(where)
+    .orderBy(getLookupOrderBy(contentTypes, query.sortBy, query.sortOrder));
 }
 
 export async function getContentTypeById(id: string) {

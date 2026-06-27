@@ -8,8 +8,9 @@ import { employees, profiles } from '@db/schema/core.js';
 import { businessClients } from '@db/schema/crm.js';
 import { db } from '@lib/db.js';
 import { ConflictError, NotFoundError } from '@shared/errors/http-error.js';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
 import type { AnyColumn } from 'drizzle-orm';
-import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { formatDateTime, getOrderBy } from '../crm.helpers.js';
 
 function getSortColumn(sortBy?: string): AnyColumn {
@@ -27,7 +28,17 @@ export async function listBusinessClients(
   query: ListBusinessClientsQuery,
   user: NonNullable<Express.Request['user']>
 ) {
-  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+  let advisorIds: string[] | undefined;
+  if (user.roles.includes('advisor')) {
+    advisorIds = [user.id];
+  } else if (user.roles.includes('supervisor')) {
+    advisorIds = await getSupervisedAdvisorIds(user.id);
+    if (query.advisorId) {
+      advisorIds = advisorIds.filter((id) => id === query.advisorId);
+    }
+  } else if (query.advisorId) {
+    advisorIds = [query.advisorId];
+  }
 
   const conditions = [];
   conditions.push(isNull(businessClients.deletedAt));
@@ -36,8 +47,8 @@ export async function listBusinessClients(
     conditions.push(eq(businessClients.isActive, query.isActive));
   }
 
-  if (advisorId) {
-    conditions.push(eq(businessClients.advisorId, advisorId));
+  if (advisorIds && advisorIds.length > 0) {
+    conditions.push(inArray(businessClients.advisorId, advisorIds));
   }
 
   if (query.search) {

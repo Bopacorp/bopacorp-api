@@ -267,7 +267,7 @@ export async function createCatalogItem(input: CreateCatalogItemRequest) {
     throw new ConflictError(`Catalog item with name '${input.name}' already exists`);
   }
 
-  return db.transaction(async (tx) => {
+  const insertedId = await db.transaction(async (tx) => {
     const [item] = await tx
       .insert(catalogItems)
       .values({
@@ -378,14 +378,16 @@ export async function createCatalogItem(input: CreateCatalogItemRequest) {
       });
     }
 
-    return getCatalogItemById(item.id);
+    return item.id;
   });
+
+  return getCatalogItemById(insertedId);
 }
 
 export async function updateCatalogItem(id: string, input: UpdateCatalogItemRequest) {
   await getCatalogItemById(id);
 
-  return db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const updateData: Partial<typeof catalogItems.$inferInsert> = {
       updatedAt: new Date(),
     };
@@ -505,9 +507,9 @@ export async function updateCatalogItem(id: string, input: UpdateCatalogItemRequ
         expirationDate: input.temporalConditions.expirationDate,
       });
     }
-
-    return getCatalogItemById(id);
   });
+
+  return getCatalogItemById(id);
 }
 
 export async function removeCatalogItem(id: string) {

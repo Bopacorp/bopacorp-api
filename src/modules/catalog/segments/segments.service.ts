@@ -7,11 +7,15 @@ import { segments } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { eq } from 'drizzle-orm';
-import { buildLookupListConditions } from '../catalog.helpers.js';
+import { buildLookupListConditions, getLookupOrderBy } from '../catalog.helpers.js';
 
 export async function listSegments(query: ListSegmentsQuery) {
   const where = buildLookupListConditions(query, segments);
-  return db.select().from(segments).where(where).orderBy(segments.code);
+  return db
+    .select()
+    .from(segments)
+    .where(where)
+    .orderBy(getLookupOrderBy(segments, query.sortBy, query.sortOrder));
 }
 
 export async function getSegmentById(id: string) {

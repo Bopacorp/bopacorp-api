@@ -7,11 +7,15 @@ import { contractTypes } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { eq } from 'drizzle-orm';
-import { buildLookupListConditions } from '../catalog.helpers.js';
+import { buildLookupListConditions, getLookupOrderBy } from '../catalog.helpers.js';
 
 export async function listContractTypes(query: ListContractTypesQuery) {
   const where = buildLookupListConditions(query, contractTypes);
-  return db.select().from(contractTypes).where(where).orderBy(contractTypes.code);
+  return db
+    .select()
+    .from(contractTypes)
+    .where(where)
+    .orderBy(getLookupOrderBy(contractTypes, query.sortBy, query.sortOrder));
 }
 
 export async function getContractTypeById(id: string) {

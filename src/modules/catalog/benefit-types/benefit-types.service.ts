@@ -7,11 +7,15 @@ import { benefitTypes } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { eq } from 'drizzle-orm';
-import { buildLookupListConditions } from '../catalog.helpers.js';
+import { buildLookupListConditions, getLookupOrderBy } from '../catalog.helpers.js';
 
 export async function listBenefitTypes(query: ListBenefitTypesQuery) {
   const where = buildLookupListConditions(query, benefitTypes);
-  return db.select().from(benefitTypes).where(where).orderBy(benefitTypes.code);
+  return db
+    .select()
+    .from(benefitTypes)
+    .where(where)
+    .orderBy(getLookupOrderBy(benefitTypes, query.sortBy, query.sortOrder));
 }
 
 export async function getBenefitTypeById(id: string) {

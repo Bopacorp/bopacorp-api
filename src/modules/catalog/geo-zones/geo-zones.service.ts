@@ -7,11 +7,15 @@ import { geoZones } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { eq } from 'drizzle-orm';
-import { buildLookupListConditions } from '../catalog.helpers.js';
+import { buildLookupListConditions, getLookupOrderBy } from '../catalog.helpers.js';
 
 export async function listGeoZones(query: ListGeoZonesQuery) {
   const where = buildLookupListConditions(query, geoZones);
-  return db.select().from(geoZones).where(where).orderBy(geoZones.code);
+  return db
+    .select()
+    .from(geoZones)
+    .where(where)
+    .orderBy(getLookupOrderBy(geoZones, query.sortBy, query.sortOrder));
 }
 
 export async function getGeoZoneById(id: string) {

@@ -9,15 +9,18 @@ import type {
   UpdateNegotiationDocumentRequest,
 } from '@bopacorp/shared/documents';
 import { env } from '@config/env.js';
-import { users } from '@db/schema/auth.js';
-import { negotiations } from '@db/schema/crm.js';
+import { roles, userRoles, users } from '@db/schema/auth.js';
+import { businessClients, negotiations } from '@db/schema/crm.js';
 import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/schema/documents.js';
 import { db } from '@lib/db.js';
 import { decryptBuffer } from '@lib/encryption.js';
 import { downloadFile } from '@lib/storage.js';
+import { createNotification } from '@modules/notifications/notifications.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
-import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
+import { ZipArchive } from 'archiver';
+import { and, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 
 // ── Document Types ──
 
@@ -167,7 +170,17 @@ export async function listDocuments(
   query: ListNegotiationDocumentsQuery,
   user: NonNullable<Express.Request['user']>
 ) {
-  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+  let advisorIds: string[] | undefined;
+  if (user.roles.includes('advisor')) {
+    advisorIds = [user.id];
+  } else if (user.roles.includes('supervisor')) {
+    advisorIds = await getSupervisedAdvisorIds(user.id);
+    if (query.advisorId) {
+      advisorIds = advisorIds.filter((id) => id === query.advisorId);
+    }
+  } else if (query.advisorId) {
+    advisorIds = [query.advisorId];
+  }
 
   const conditions = [];
   conditions.push(isNull(negotiationDocuments.deletedAt));
@@ -188,8 +201,8 @@ export async function listDocuments(
     conditions.push(eq(negotiationDocuments.uploadedBy, query.uploadedBy));
   }
 
-  if (advisorId) {
-    conditions.push(eq(negotiations.advisorId, advisorId));
+  if (advisorIds && advisorIds.length > 0) {
+    conditions.push(inArray(negotiations.advisorId, advisorIds));
   }
 
   if (query.search) {
@@ -295,6 +308,13 @@ export async function getDocumentById(id: string, user?: NonNullable<Express.Req
     throw new ForbiddenError('You can only access documents from your own negotiations');
   }
 
+  if (user?.roles.includes('supervisor')) {
+    const supervised = await getSupervisedAdvisorIds(user.id);
+    if (!supervised.includes(row.negotiation.advisorId)) {
+      throw new ForbiddenError('You can only access documents from your supervised advisors');
+    }
+  }
+
   const uploader = row.uploadedBy;
   const uploaderProfile = uploader?.profile;
 
@@ -383,6 +403,26 @@ export async function createDocument(userId: string, data: CreateNegotiationDocu
     notes: 'Document uploaded',
   });
 
+  const client = await db.query.businessClients.findFirst({
+    where: eq(businessClients.id, negotiation.clientId),
+  });
+
+  const coordinators = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(and(eq(roles.slug, 'coordinator'), eq(userRoles.isActive, true)));
+
+  for (const coord of coordinators) {
+    await createNotification({
+      recipientId: coord.userId,
+      title: 'Documento por revisar',
+      message: `${client?.businessName ?? 'Cliente'} - ${documentType.name}`,
+      referenceType: 'document',
+      referenceId: row.id,
+    });
+  }
+
   return getDocumentById(row.id);
 }
 
@@ -460,6 +500,23 @@ export async function changeDocumentState(
     notes: data.coordinatorMessage,
   });
 
+  if (newState === 'ACCEPTED' || newState === 'REJECTED') {
+    const negotiation = await db.query.negotiations.findFirst({
+      where: eq(negotiations.id, document.negotiation.id),
+    });
+
+    if (negotiation) {
+      const stateLabel = newState === 'ACCEPTED' ? 'aprobado' : 'rechazado';
+      await createNotification({
+        recipientId: negotiation.advisorId,
+        title: `Documento ${stateLabel}`,
+        message: `${document.negotiation.client.businessName} - ${document.documentType.name}`,
+        referenceType: 'document',
+        referenceId: id,
+      });
+    }
+  }
+
   return getDocumentById(id);
 }
 
@@ -475,6 +532,13 @@ export async function downloadDocument(id: string, user?: NonNullable<Express.Re
 
   if (user?.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
     throw new ForbiddenError('You can only access documents from your own negotiations');
+  }
+
+  if (user?.roles.includes('supervisor')) {
+    const supervised = await getSupervisedAdvisorIds(user.id);
+    if (!supervised.includes(row.negotiation.advisorId)) {
+      throw new ForbiddenError('You can only access documents from your supervised advisors');
+    }
   }
 
   if (!row.encryptionMetadata) {
@@ -494,6 +558,131 @@ export async function downloadDocument(id: string, user?: NonNullable<Express.Re
     filename: row.filename,
     mimeType: row.mimeType,
   };
+}
+
+export async function downloadNegotiationDocuments(
+  negotiationId: string,
+  user: NonNullable<Express.Request['user']>,
+  status?: string
+) {
+  const negotiation = await db.query.negotiations.findFirst({
+    where: eq(negotiations.id, negotiationId),
+    with: { client: true },
+  });
+
+  if (!negotiation) {
+    throw new NotFoundError('Negotiation', negotiationId);
+  }
+
+  if (user.roles.includes('advisor') && negotiation.advisorId !== user.id) {
+    throw new ForbiddenError('You can only access documents from your own negotiations');
+  }
+
+  if (user.roles.includes('supervisor')) {
+    const supervised = await getSupervisedAdvisorIds(user.id);
+    if (!supervised.includes(negotiation.advisorId)) {
+      throw new ForbiddenError('You can only access documents from your supervised advisors');
+    }
+  }
+
+  const conditions: SQL[] = [
+    eq(negotiationDocuments.negotiationId, negotiationId),
+    isNull(negotiationDocuments.deletedAt),
+  ];
+
+  if (status === 'PENDING_APPROVAL' || status === 'ACCEPTED' || status === 'REJECTED') {
+    conditions.push(eq(negotiationDocuments.state, status));
+  }
+
+  const docs = await db.query.negotiationDocuments.findMany({
+    where: and(...conditions),
+    with: { documentType: true },
+  });
+
+  if (docs.length === 0) {
+    throw new NotFoundError('Documents for negotiation', negotiationId);
+  }
+
+  const archive = new ZipArchive({ zlib: { level: 5 } });
+
+  for (const doc of docs) {
+    if (!doc.encryptionMetadata) continue;
+
+    try {
+      const encryptedBody = await downloadFile(doc.storagePath, env.DOCUMENTS_STORAGE_BUCKET);
+      if (!encryptedBody) continue;
+
+      const encryptedBuffer = Buffer.from(await encryptedBody.transformToByteArray());
+      const buffer = decryptBuffer(encryptedBuffer, doc.encryptionMetadata);
+
+      const zipFilename = `${doc.documentType.name}_${doc.filename}`;
+      archive.append(buffer, { name: zipFilename });
+    } catch {}
+  }
+
+  archive.finalize();
+
+  return { archive, negotiationId };
+}
+
+// ── Pending Summary ──
+
+export async function getPendingSummary() {
+  const rows = await db.execute<{
+    advisor_id: string;
+    first_name: string;
+    last_name: string;
+    pending_upload: number;
+    pending_review: number;
+  }>(sql`
+    WITH active_negotiations AS (
+      SELECT n.id, n.advisor_id
+      FROM crm.negotiations n
+      INNER JOIN crm.negotiation_states ns ON ns.id = n.state_id
+      WHERE n.is_active = true AND n.deleted_at IS NULL AND ns.position IN (1, 2, 3)
+    ),
+    mandatory_types AS (
+      SELECT id FROM documents.document_types
+      WHERE is_mandatory = true AND is_active = true
+    ),
+    pending_upload AS (
+      SELECT an.advisor_id, count(*) AS cnt
+      FROM active_negotiations an
+      CROSS JOIN mandatory_types mt
+      WHERE NOT EXISTS (
+        SELECT 1 FROM documents.negotiation_documents nd
+        WHERE nd.negotiation_id = an.id AND nd.document_type_id = mt.id AND nd.deleted_at IS NULL
+      )
+      GROUP BY an.advisor_id
+    ),
+    pending_review AS (
+      SELECT an.advisor_id, count(*) AS cnt
+      FROM documents.negotiation_documents nd
+      INNER JOIN active_negotiations an ON an.id = nd.negotiation_id
+      WHERE nd.state = 'PENDING_APPROVAL' AND nd.deleted_at IS NULL
+      GROUP BY an.advisor_id
+    )
+    SELECT
+      coalesce(pu.advisor_id, pr.advisor_id) AS advisor_id,
+      p.first_name, p.last_name,
+      cast(coalesce(pu.cnt, 0) AS int) AS pending_upload,
+      cast(coalesce(pr.cnt, 0) AS int) AS pending_review
+    FROM pending_upload pu
+    FULL OUTER JOIN pending_review pr ON pu.advisor_id = pr.advisor_id
+    INNER JOIN core.profiles p ON p.user_id = coalesce(pu.advisor_id, pr.advisor_id)
+    ORDER BY (coalesce(pu.cnt, 0) + coalesce(pr.cnt, 0)) DESC
+  `);
+
+  return rows.rows.map((row) => ({
+    advisor: {
+      id: row.advisor_id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+    },
+    pendingUpload: row.pending_upload,
+    pendingReview: row.pending_review,
+    totalPending: row.pending_upload + row.pending_review,
+  }));
 }
 
 // ── Document State History ──

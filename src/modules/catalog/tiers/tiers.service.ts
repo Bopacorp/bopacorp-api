@@ -7,11 +7,15 @@ import { tiers } from '@db/schema/catalog.js';
 import { db } from '@lib/db.js';
 import { ConflictError, InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
 import { eq } from 'drizzle-orm';
-import { buildLookupListConditions } from '../catalog.helpers.js';
+import { buildLookupListConditions, getLookupOrderBy } from '../catalog.helpers.js';
 
 export async function listTiers(query: ListTiersQuery) {
   const where = buildLookupListConditions(query, tiers);
-  return db.select().from(tiers).where(where).orderBy(tiers.code);
+  return db
+    .select()
+    .from(tiers)
+    .where(where)
+    .orderBy(getLookupOrderBy(tiers, query.sortBy, query.sortOrder));
 }
 
 export async function getTierById(id: string) {

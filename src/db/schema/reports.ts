@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
-  date,
   decimal,
   index,
   integer,
@@ -12,7 +12,6 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
-import { employees } from './core.js';
 
 export const reportsSchema = pgSchema('reports');
 
@@ -22,31 +21,26 @@ export const reportTypeEnum = pgEnum('report_type', [
   'ADVISOR_DASHBOARD',
 ]);
 
-export const salesObjectives = reportsSchema.table(
-  'sales_objectives',
+export const salesTargets = reportsSchema.table(
+  'sales_targets',
   {
     id: uuid().primaryKey().defaultRandom(),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
-    advisorId: uuid('advisor_id').references(() => employees.userId, {
-      onDelete: 'set null',
-    }),
-    targetSalesAmount: decimal('target_sales_amount', {
-      precision: 15,
-      scale: 2,
-    }).notNull(),
-    targetClosedDeals: integer('target_closed_deals').notNull(),
-    periodStart: date('period_start').notNull(),
-    periodEnd: date('period_end').notNull(),
+    tierCode: varchar('tier_code', { length: 20 }).notNull().unique(),
+    tierLabel: varchar('tier_label', { length: 50 }).notNull(),
+    minBilling: decimal('min_billing', { precision: 15, scale: 2 }).notNull().default('0'),
+    maxBilling: decimal('max_billing', { precision: 15, scale: 2 }),
+    minCloses: integer('min_closes').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [
-    check('chk_objective_period', sql`period_end >= period_start`),
-    index('idx_sales_objectives_created_by').on(t.createdBy),
-    index('idx_sales_objectives_advisor').on(t.advisorId),
-    index('idx_sales_objectives_period').on(t.periodStart, t.periodEnd),
+    check('chk_min_billing', sql`min_billing >= 0`),
+    check('chk_min_closes', sql`min_closes >= 0`),
+    index('idx_sales_targets_tier_code').on(t.tierCode),
   ]
 );
 

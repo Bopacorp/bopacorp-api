@@ -1,47 +1,46 @@
 import type {
   CreateReportExportRequest,
-  CreateSalesObjectiveRequest,
   ListAdvisorMetricsQuery,
+  ListAdvisorPerformanceQuery,
+  ListRecentActivityQuery,
   ListReportExportsQuery,
-  ListSalesObjectivesQuery,
-  UpdateSalesObjectiveRequest,
+  UpdateSalesTargetRequest,
 } from '@bopacorp/shared/reports';
-import { ForbiddenError, UnauthorizedError } from '@shared/errors/http-error.js';
+import { UnauthorizedError } from '@shared/errors/http-error.js';
 import type { Request, Response } from 'express';
 import * as service from './reports.service.js';
 
-// ── Sales Objectives ──
+// ── Sales Targets ──
 
-export async function listObjectives(req: Request, res: Response) {
-  const query = req.query as unknown as ListSalesObjectivesQuery;
-  const result = await service.listObjectives(query);
-  res.json({ success: true, data: result.data, meta: result.meta });
+export async function listTargets(_req: Request, res: Response) {
+  const result = await service.listTargets();
+  res.json({ success: true, data: result.data });
 }
 
-export async function getObjectiveById(req: Request<{ id: string }>, res: Response) {
-  const data = await service.getObjectiveById(req.params.id);
+export async function updateTarget(req: Request<{ id: string }>, res: Response) {
+  const data = await service.updateTarget(req.params.id, req.body as UpdateSalesTargetRequest);
   res.json({ success: true, data });
 }
 
-export async function createObjective(req: Request, res: Response) {
+// ── Advisor Performance ──
+
+const MANAGEMENT_ROLES = ['admin', 'manager', 'supervisor', 'coordinator'];
+
+export async function getAdvisorPerformance(req: Request, res: Response) {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required');
   }
-  const data = await service.createObjective(req.user.id, req.body as CreateSalesObjectiveRequest);
-  res.status(201).json({ success: true, data });
-}
 
-export async function updateObjective(req: Request<{ id: string }>, res: Response) {
-  const data = await service.updateObjective(
-    req.params.id,
-    req.body as UpdateSalesObjectiveRequest
-  );
-  res.json({ success: true, data });
-}
+  const query = req.query as unknown as ListAdvisorPerformanceQuery;
+  const isManagement = req.user.roles.some((role) => MANAGEMENT_ROLES.includes(role));
 
-export async function removeObjective(req: Request<{ id: string }>, res: Response) {
-  await service.removeObjective(req.params.id);
-  res.json({ success: true, data: null });
+  if (!isManagement) {
+    res.json({ success: true, data: [] });
+    return;
+  }
+
+  const result = await service.getAdvisorPerformance(query);
+  res.json({ success: true, data: result.data });
 }
 
 // ── Report Exports ──
@@ -67,19 +66,26 @@ export async function createExport(req: Request, res: Response) {
 
 // ── Advisor Metrics ──
 
-const MANAGEMENT_ROLES = ['admin', 'manager', 'supervisor', 'coordinator'];
-
 export async function listAdvisorMetrics(req: Request, res: Response) {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required');
   }
 
-  const canViewMetrics = req.user.roles.some((role) => MANAGEMENT_ROLES.includes(role));
-  if (!canViewMetrics) {
-    throw new ForbiddenError('Management access required');
+  const query = req.query as unknown as ListAdvisorMetricsQuery;
+  const isManagement = req.user.roles.some((role) => MANAGEMENT_ROLES.includes(role));
+
+  if (!isManagement) {
+    query.advisorId = req.user.id;
   }
 
-  const query = req.query as unknown as ListAdvisorMetricsQuery;
   const result = await service.listAdvisorMetrics(query);
   res.json({ success: true, data: result.data });
+}
+
+// ── Recent Activity ──
+
+export async function listRecentActivity(req: Request, res: Response) {
+  const query = req.query as unknown as ListRecentActivityQuery;
+  const result = await service.listRecentActivity(query);
+  res.json({ success: true, data: result.data, meta: result.meta });
 }

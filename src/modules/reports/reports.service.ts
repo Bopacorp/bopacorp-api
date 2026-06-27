@@ -1,183 +1,232 @@
 import type {
   CreateReportExportRequest,
-  CreateSalesObjectiveRequest,
   ListAdvisorMetricsQuery,
+  ListAdvisorPerformanceQuery,
+  ListRecentActivityQuery,
   ListReportExportsQuery,
-  ListSalesObjectivesQuery,
-  UpdateSalesObjectiveRequest,
+  UpdateSalesTargetRequest,
 } from '@bopacorp/shared/reports';
 import { roles, userRoles, users } from '@db/schema/auth.js';
-import { employees } from '@db/schema/core.js';
-import { businessClients, negotiationStates, negotiations, visits } from '@db/schema/crm.js';
-import { reportExports, salesObjectives } from '@db/schema/reports.js';
+import { profiles } from '@db/schema/core.js';
+import {
+  businessClients,
+  negotiationStateHistory,
+  negotiationStates,
+  negotiations,
+  visits,
+} from '@db/schema/crm.js';
+import { reportExports, salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
-import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
-// ── Sales Objectives ──
+// ── Sales Targets ──
 
-export async function listObjectives(query: ListSalesObjectivesQuery) {
-  const conditions = [];
-
-  if (query.createdBy) {
-    conditions.push(eq(salesObjectives.createdBy, query.createdBy));
-  }
-
-  if (query.advisorId) {
-    conditions.push(eq(salesObjectives.advisorId, query.advisorId));
-  }
-
-  if (query.periodStart) {
-    conditions.push(eq(salesObjectives.periodStart, query.periodStart));
-  }
-
-  if (query.periodEnd) {
-    conditions.push(eq(salesObjectives.periodEnd, query.periodEnd));
-  }
-
-  const where = conditions.length > 0 ? and(...conditions) : sql`true`;
-
-  const totalItems = await db.$count(salesObjectives, where);
-  const totalPages = Math.ceil(totalItems / query.limit);
-
+export async function listTargets() {
   const rows = await db
     .select()
-    .from(salesObjectives)
-    .where(where)
-    .limit(query.limit)
-    .offset((query.page - 1) * query.limit)
-    .orderBy(salesObjectives.createdAt);
-
-  const data = await Promise.all(
-    rows.map(async (row) => {
-      const creator = await db.query.users.findFirst({
-        where: eq(users.id, row.createdBy),
-      });
-
-      const advisor = row.advisorId
-        ? await db.query.employees.findFirst({
-            where: eq(employees.userId, row.advisorId),
-            with: { user: { with: { profile: true } } },
-          })
-        : null;
-
-      return {
-        id: row.id,
-        targetSalesAmount: Number(row.targetSalesAmount),
-        targetClosedDeals: row.targetClosedDeals,
-        periodStart: row.periodStart,
-        periodEnd: row.periodEnd,
-        createdBy: creator
-          ? {
-              id: creator.id,
-              username: creator.username,
-              email: creator.email,
-              profile: null,
-            }
-          : null,
-        advisor: advisor
-          ? {
-              id: advisor.userId,
-              userId: advisor.userId,
-              profile: advisor.user?.profile
-                ? {
-                    firstName: advisor.user.profile.firstName,
-                    lastName: advisor.user.profile.lastName,
-                  }
-                : null,
-            }
-          : null,
-        createdAt: formatDateTime(row.createdAt),
-        updatedAt: formatDateTime(row.updatedAt),
-      };
-    })
-  );
+    .from(salesTargets)
+    .where(eq(salesTargets.isActive, true))
+    .orderBy(desc(salesTargets.minBilling));
 
   return {
-    data,
-    meta: { page: query.page, limit: query.limit, totalItems, totalPages },
+    data: rows.map((row) => ({
+      id: row.id,
+      tierCode: row.tierCode,
+      tierLabel: row.tierLabel,
+      minBilling: Number(row.minBilling),
+      maxBilling: row.maxBilling ? Number(row.maxBilling) : null,
+      minCloses: row.minCloses,
+      isActive: row.isActive,
+      createdAt: formatDateTime(row.createdAt),
+      updatedAt: formatDateTime(row.updatedAt),
+    })),
   };
 }
 
-export async function getObjectiveById(id: string) {
-  const row = await db.query.salesObjectives.findFirst({
-    where: eq(salesObjectives.id, id),
-    with: { creator: true, advisor: true },
-  });
+export async function updateTarget(id: string, data: UpdateSalesTargetRequest) {
+  const existing = await db.select().from(salesTargets).where(eq(salesTargets.id, id)).limit(1);
 
-  if (!row) {
-    throw new NotFoundError('Sales objective', id);
+  if (existing.length === 0) {
+    throw new NotFoundError('Sales target', id);
   }
 
-  return {
-    id: row.id,
-    targetSalesAmount: Number(row.targetSalesAmount),
-    targetClosedDeals: row.targetClosedDeals,
-    periodStart: row.periodStart,
-    periodEnd: row.periodEnd,
-    createdBy: row.creator
-      ? {
-          id: row.creator.id,
-          username: row.creator.username,
-          email: row.creator.email,
-          profile: null,
-        }
-      : null,
-    advisor: row.advisor
-      ? {
-          id: row.advisor.userId,
-          userId: row.advisor.userId,
-          profile: null,
-        }
-      : null,
-    createdAt: formatDateTime(row.createdAt),
-    updatedAt: formatDateTime(row.updatedAt),
-  };
-}
+  const updateData: Partial<typeof salesTargets.$inferInsert> = {};
 
-export async function createObjective(userId: string, data: CreateSalesObjectiveRequest) {
-  const [row] = await db
-    .insert(salesObjectives)
-    .values({
-      createdBy: userId,
-      advisorId: data.advisorId,
-      targetSalesAmount: data.targetSalesAmount.toString(),
-      targetClosedDeals: data.targetClosedDeals,
-      periodStart: data.periodStart,
-      periodEnd: data.periodEnd,
-    })
-    .returning();
-
-  if (!row) {
-    throw new Error('Failed to create sales objective');
-  }
-
-  return getObjectiveById(row.id);
-}
-
-export async function updateObjective(id: string, data: UpdateSalesObjectiveRequest) {
-  await getObjectiveById(id);
-
-  const updateData: Partial<typeof salesObjectives.$inferInsert> = {};
-
-  if (data.advisorId !== undefined) updateData.advisorId = data.advisorId;
-  if (data.targetSalesAmount !== undefined)
-    updateData.targetSalesAmount = data.targetSalesAmount.toString();
-  if (data.targetClosedDeals !== undefined) updateData.targetClosedDeals = data.targetClosedDeals;
-  if (data.periodStart !== undefined) updateData.periodStart = data.periodStart;
-  if (data.periodEnd !== undefined) updateData.periodEnd = data.periodEnd;
+  if (data.tierLabel !== undefined) updateData.tierLabel = data.tierLabel;
+  if (data.minBilling !== undefined) updateData.minBilling = data.minBilling.toString();
+  if (data.maxBilling !== undefined)
+    updateData.maxBilling = data.maxBilling !== null ? data.maxBilling.toString() : null;
+  if (data.minCloses !== undefined) updateData.minCloses = data.minCloses;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
   if (Object.keys(updateData).length > 0) {
-    await db.update(salesObjectives).set(updateData).where(eq(salesObjectives.id, id));
+    updateData.updatedAt = new Date();
+    await db.update(salesTargets).set(updateData).where(eq(salesTargets.id, id));
   }
 
-  return getObjectiveById(id);
+  const [updated] = await db.select().from(salesTargets).where(eq(salesTargets.id, id));
+
+  if (!updated) {
+    throw new NotFoundError('Sales target', id);
+  }
+
+  return {
+    id: updated.id,
+    tierCode: updated.tierCode,
+    tierLabel: updated.tierLabel,
+    minBilling: Number(updated.minBilling),
+    maxBilling: updated.maxBilling ? Number(updated.maxBilling) : null,
+    minCloses: updated.minCloses,
+    isActive: updated.isActive,
+    createdAt: formatDateTime(updated.createdAt),
+    updatedAt: formatDateTime(updated.updatedAt),
+  };
 }
 
-export async function removeObjective(id: string) {
-  await getObjectiveById(id);
-  await db.delete(salesObjectives).where(eq(salesObjectives.id, id));
+// ── Advisor Performance ──
+
+async function getAdvisorIds(supervisorId?: string | undefined) {
+  const advisorRole = await db.query.roles.findFirst({
+    where: eq(roles.slug, 'advisor'),
+  });
+
+  if (!advisorRole) return [];
+
+  const advisorRows = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .where(eq(userRoles.roleId, advisorRole.id));
+
+  let advisorIds = advisorRows.map((r) => r.userId);
+
+  if (supervisorId) {
+    const supervisedIds = new Set(await getSupervisedAdvisorIds(supervisorId));
+    advisorIds = advisorIds.filter((id) => supervisedIds.has(id));
+  }
+
+  return advisorIds;
+}
+
+export async function getAdvisorPerformance(query: ListAdvisorPerformanceQuery) {
+  const targets = await db
+    .select()
+    .from(salesTargets)
+    .where(eq(salesTargets.isActive, true))
+    .orderBy(desc(salesTargets.minBilling));
+
+  if (targets.length === 0) {
+    return { data: [] };
+  }
+
+  const advisorIds = await getAdvisorIds(query.supervisorId);
+  if (advisorIds.length === 0) {
+    return { data: [] };
+  }
+
+  const closingState = await db
+    .select({ id: negotiationStates.id })
+    .from(negotiationStates)
+    .where(and(eq(negotiationStates.code, 'closing'), eq(negotiationStates.isActive, true)))
+    .limit(1);
+
+  const closingRow = closingState[0];
+  if (!closingRow) {
+    return { data: [] };
+  }
+
+  const closingStateId = closingRow.id;
+
+  const dateConditions = [];
+  if (query.dateFrom) {
+    dateConditions.push(gte(negotiationStateHistory.createdAt, new Date(query.dateFrom)));
+  }
+  if (query.dateTo) {
+    const endOfDay = new Date(query.dateTo);
+    endOfDay.setHours(23, 59, 59, 999);
+    dateConditions.push(lte(negotiationStateHistory.createdAt, endOfDay));
+  }
+
+  const tierCaseFragments = targets.map((t) => {
+    const min = Number(t.minBilling);
+    const max = t.maxBilling ? Number(t.maxBilling) : null;
+    if (max === null) {
+      return sql`WHEN ${businessClients.currentMonthlyBilling} >= ${min} THEN ${t.tierCode}`;
+    }
+    return sql`WHEN ${businessClients.currentMonthlyBilling} >= ${min} AND ${businessClients.currentMonthlyBilling} <= ${max} THEN ${t.tierCode}`;
+  });
+
+  const tierCaseExpr = sql`CASE ${sql.join(tierCaseFragments, sql` `)} ELSE 'UNKNOWN' END`;
+
+  const closedCounts = await db
+    .select({
+      advisorId: negotiations.advisorId,
+      tierCode: sql<string>`${tierCaseExpr}`.as('tier_code'),
+      count: sql<number>`count(*)::int`.as('closed_count'),
+    })
+    .from(negotiationStateHistory)
+    .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+    .innerJoin(businessClients, eq(negotiations.clientId, businessClients.id))
+    .where(
+      and(
+        eq(negotiationStateHistory.newStateId, closingStateId),
+        inArray(negotiations.advisorId, advisorIds),
+        isNull(negotiations.deletedAt),
+        isNull(businessClients.deletedAt),
+        ...dateConditions
+      )
+    )
+    .groupBy(negotiations.advisorId, sql`tier_code`);
+
+  const countMap = new Map<string, Map<string, number>>();
+  for (const row of closedCounts) {
+    if (!countMap.has(row.advisorId)) {
+      countMap.set(row.advisorId, new Map());
+    }
+    countMap.get(row.advisorId)?.set(row.tierCode, row.count);
+  }
+
+  const advisorUsers = await db.query.users.findMany({
+    where: inArray(users.id, advisorIds),
+    with: { profile: true },
+  });
+
+  const data = advisorUsers.map((user) => {
+    const advisorCounts = countMap.get(user.id);
+
+    const tiers = targets.map((t) => {
+      const closedCount = advisorCounts?.get(t.tierCode) ?? 0;
+      return {
+        tierCode: t.tierCode,
+        tierLabel: t.tierLabel,
+        closedCount,
+        minCloses: t.minCloses,
+        met: closedCount >= t.minCloses,
+      };
+    });
+
+    const totalClosed = tiers.reduce((sum, t) => sum + t.closedCount, 0);
+    const totalRequired = tiers.reduce((sum, t) => sum + t.minCloses, 0);
+
+    return {
+      advisor: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        profile: user.profile
+          ? { firstName: user.profile.firstName, lastName: user.profile.lastName }
+          : null,
+      },
+      tiers,
+      totalClosed,
+      totalRequired,
+      overallMet: tiers.every((t) => t.met),
+    };
+  });
+
+  return { data };
 }
 
 // ── Report Exports ──
@@ -293,10 +342,6 @@ export async function createExport(userId: string, data: CreateReportExportReque
 
 // ── Advisor Metrics ──
 
-const ADVISOR_STATE_CODES = ['initial_contact', 'negotiation', 'closing', 'post_sale'] as const;
-
-type AdvisorStateCode = (typeof ADVISOR_STATE_CODES)[number];
-
 function buildDateRangeConditions(
   query: ListAdvisorMetricsQuery,
   dateColumn: typeof negotiations.createdAt | typeof visits.visitDate
@@ -317,33 +362,28 @@ function buildDateRangeConditions(
 }
 
 export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
-  const advisorRole = await db.query.roles.findFirst({
-    where: eq(roles.slug, 'advisor'),
-  });
+  let advisorIds = await getAdvisorIds(query.supervisorId);
 
-  if (!advisorRole) {
-    return { data: [] };
+  if (query.advisorId) {
+    advisorIds = advisorIds.filter((id) => id === query.advisorId);
   }
-
-  const advisorRows = await db
-    .select({ userId: userRoles.userId })
-    .from(userRoles)
-    .where(eq(userRoles.roleId, advisorRole.id));
-
-  const advisorIds = advisorRows.map((r) => r.userId);
 
   if (advisorIds.length === 0) {
     return { data: [] };
   }
 
-  const stateRows = await db
-    .select()
+  const allStates = await db
+    .select({
+      id: negotiationStates.id,
+      code: negotiationStates.code,
+      name: negotiationStates.name,
+      position: negotiationStates.position,
+    })
     .from(negotiationStates)
-    .where(inArray(negotiationStates.code, [...ADVISOR_STATE_CODES]));
+    .where(eq(negotiationStates.isActive, true))
+    .orderBy(negotiationStates.position);
 
-  const stateIds = Object.fromEntries(
-    stateRows.map((state) => [state.code as AdvisorStateCode, state.id])
-  ) as Record<AdvisorStateCode, string>;
+  const closingState = allStates.find((s) => s.code === 'closing');
 
   const advisorUsers = await db.query.users.findMany({
     where: inArray(users.id, advisorIds),
@@ -365,7 +405,6 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
       and(
         inArray(negotiations.advisorId, advisorIds),
         isNull(negotiations.deletedAt),
-        inArray(negotiations.stateId, Object.values(stateIds)),
         ...negotiationDateConditions
       )
     )
@@ -411,6 +450,28 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
     ])
   );
 
+  let closingDaysMap = new Map<string, number>();
+  if (closingState) {
+    const closingDaysRows = await db
+      .select({
+        advisorId: negotiations.advisorId,
+        avgDays: sql<number>`round(avg(extract(epoch from (${negotiationStateHistory.createdAt} - ${negotiations.createdAt})) / 86400)::numeric, 1)`,
+      })
+      .from(negotiationStateHistory)
+      .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+      .where(
+        and(
+          eq(negotiationStateHistory.newStateId, closingState.id),
+          inArray(negotiations.advisorId, advisorIds),
+          isNull(negotiations.deletedAt),
+          ...negotiationDateConditions
+        )
+      )
+      .groupBy(negotiations.advisorId);
+
+    closingDaysMap = new Map(closingDaysRows.map((r) => [r.advisorId, Number(r.avgDays)]));
+  }
+
   const data = advisorIds
     .map((advisorId) => {
       const user = userMap.get(advisorId);
@@ -418,6 +479,13 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
 
       const negCounts = negCountMap.get(advisorId);
       const billing = billingMap.get(advisorId) ?? { billed: 0, services: 0 };
+
+      const stateCounts = allStates.map((state) => ({
+        stateId: state.id,
+        stateCode: state.code,
+        stateName: state.name,
+        count: negCounts?.get(state.id) ?? 0,
+      }));
 
       return {
         advisor: {
@@ -427,17 +495,128 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
             ? { firstName: user.profile.firstName, lastName: user.profile.lastName }
             : null,
         },
-        clientsContacted: negCounts?.get(stateIds.initial_contact) ?? 0,
-        clientsInNegotiation: negCounts?.get(stateIds.negotiation) ?? 0,
-        clientsClosed: negCounts?.get(stateIds.closing) ?? 0,
-        clientsPostSale: negCounts?.get(stateIds.post_sale) ?? 0,
+        stateCounts,
         clientsVisited: visitMap.get(advisorId) ?? 0,
         totalBilledAmount: billing.billed,
         averageBillingPerService:
           billing.services > 0 ? Math.round((billing.billed / billing.services) * 100) / 100 : 0,
+        avgDaysToClose: closingDaysMap.get(advisorId) ?? null,
       };
     })
     .filter(Boolean);
 
   return { data };
+}
+
+// ── Recent Activity ──
+
+interface DateRangeFilter {
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
+}
+
+function buildTimestampRangeConditions(
+  filter: DateRangeFilter,
+  dateColumn: typeof negotiationStateHistory.createdAt | typeof visits.createdAt
+) {
+  const conditions = [];
+  if (filter.dateFrom) {
+    conditions.push(gte(dateColumn, new Date(filter.dateFrom)));
+  }
+  if (filter.dateTo) {
+    const endOfDay = new Date(filter.dateTo);
+    endOfDay.setHours(23, 59, 59, 999);
+    conditions.push(lte(dateColumn, endOfDay));
+  }
+  return conditions;
+}
+
+export async function listRecentActivity(query: ListRecentActivityQuery) {
+  const stateChangeConditions = [
+    ...buildTimestampRangeConditions(query, negotiationStateHistory.createdAt),
+  ];
+
+  const visitConditions = [
+    isNull(visits.deletedAt),
+    ...buildTimestampRangeConditions(query, visits.createdAt),
+  ];
+
+  if (query.advisorId) {
+    stateChangeConditions.push(eq(negotiations.advisorId, query.advisorId));
+    visitConditions.push(eq(visits.advisorId, query.advisorId));
+  }
+
+  const prevState = db
+    .select({ id: negotiationStates.id, name: negotiationStates.name })
+    .from(negotiationStates)
+    .as('prev_state');
+
+  const newState = db
+    .select({ id: negotiationStates.id, name: negotiationStates.name })
+    .from(negotiationStates)
+    .as('new_state');
+
+  const stateChanges = await db
+    .select({
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
+      clientName: businessClients.businessName,
+      prevStateName: prevState.name,
+      newStateName: newState.name,
+      createdAt: negotiationStateHistory.createdAt,
+    })
+    .from(negotiationStateHistory)
+    .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+    .innerJoin(businessClients, eq(negotiations.clientId, businessClients.id))
+    .innerJoin(profiles, eq(negotiations.advisorId, profiles.userId))
+    .innerJoin(newState, eq(negotiationStateHistory.newStateId, newState.id))
+    .leftJoin(prevState, eq(negotiationStateHistory.previousStateId, prevState.id))
+    .where(and(isNull(negotiations.deletedAt), ...stateChangeConditions))
+    .orderBy(desc(negotiationStateHistory.createdAt))
+    .limit(query.limit * 2);
+
+  const visitRows = await db
+    .select({
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
+      clientName: businessClients.businessName,
+      createdAt: visits.createdAt,
+    })
+    .from(visits)
+    .innerJoin(businessClients, eq(visits.clientId, businessClients.id))
+    .innerJoin(profiles, eq(visits.advisorId, profiles.userId))
+    .where(and(...visitConditions))
+    .orderBy(desc(visits.createdAt))
+    .limit(query.limit * 2);
+
+  const combined = [
+    ...stateChanges.map((r) => ({
+      type: 'state_change' as const,
+      advisorName: `${r.advisorFirstName} ${r.advisorLastName}`,
+      clientName: r.clientName,
+      description: r.prevStateName
+        ? `${r.prevStateName} -> ${r.newStateName}`
+        : `${r.newStateName}`,
+      createdAt: formatDateTime(r.createdAt),
+    })),
+    ...visitRows.map((r) => ({
+      type: 'visit' as const,
+      advisorName: `${r.advisorFirstName} ${r.advisorLastName}`,
+      clientName: r.clientName,
+      description: 'Visited client',
+      createdAt: formatDateTime(r.createdAt),
+    })),
+  ];
+
+  combined.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const totalItems = combined.length;
+  const totalPages = Math.ceil(totalItems / query.limit);
+  const offset = (query.page - 1) * query.limit;
+  const data = combined.slice(offset, offset + query.limit);
+
+  return {
+    data,
+    meta: { page: query.page, limit: query.limit, totalItems, totalPages },
+  };
 }
