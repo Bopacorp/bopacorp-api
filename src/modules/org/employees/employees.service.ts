@@ -181,7 +181,49 @@ export async function getEmployeeByUserId(userId: string) {
     throw new NotFoundError('Employee', userId);
   }
 
-  return toEmployeeResponse(row);
+  const base = toEmployeeResponse(row);
+
+  const supervisorRows = await db
+    .select({
+      userId: advisorSupervisors.supervisorId,
+      username: users.username,
+      firstName: profiles.firstName,
+      lastName: profiles.lastName,
+    })
+    .from(advisorSupervisors)
+    .leftJoin(users, eq(advisorSupervisors.supervisorId, users.id))
+    .leftJoin(profiles, eq(advisorSupervisors.supervisorId, profiles.userId))
+    .where(and(eq(advisorSupervisors.advisorId, userId), eq(advisorSupervisors.isActive, true)));
+
+  const advisorRows = await db
+    .select({
+      userId: advisorSupervisors.advisorId,
+      username: users.username,
+      firstName: profiles.firstName,
+      lastName: profiles.lastName,
+    })
+    .from(advisorSupervisors)
+    .leftJoin(users, eq(advisorSupervisors.advisorId, users.id))
+    .leftJoin(profiles, eq(advisorSupervisors.advisorId, profiles.userId))
+    .where(and(eq(advisorSupervisors.supervisorId, userId), eq(advisorSupervisors.isActive, true)));
+
+  const toRelation = (r: {
+    userId: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  }) => ({
+    userId: r.userId,
+    username: r.username ?? '',
+    firstName: r.firstName ?? '',
+    lastName: r.lastName ?? '',
+  });
+
+  return {
+    ...base,
+    supervisors: supervisorRows.map(toRelation),
+    advisors: advisorRows.map(toRelation),
+  };
 }
 
 export async function createEmployee(

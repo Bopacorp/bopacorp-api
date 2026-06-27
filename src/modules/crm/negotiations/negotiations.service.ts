@@ -26,6 +26,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '@shared/errors/http-error.js';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
 import type { AnyColumn } from 'drizzle-orm';
 import { and, asc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { formatDateTime, getOrderBy } from '../crm.helpers.js';
@@ -44,7 +45,17 @@ export async function listNegotiations(
   query: ListNegotiationsQuery,
   user: NonNullable<Express.Request['user']>
 ) {
-  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+  let advisorIds: string[] | undefined;
+  if (user.roles.includes('advisor')) {
+    advisorIds = [user.id];
+  } else if (user.roles.includes('supervisor')) {
+    advisorIds = await getSupervisedAdvisorIds(user.id);
+    if (query.advisorId) {
+      advisorIds = advisorIds.filter((id) => id === query.advisorId);
+    }
+  } else if (query.advisorId) {
+    advisorIds = [query.advisorId];
+  }
 
   const conditions = [];
   conditions.push(isNull(negotiations.deletedAt));
@@ -57,8 +68,8 @@ export async function listNegotiations(
     conditions.push(eq(negotiations.clientId, query.clientId));
   }
 
-  if (advisorId) {
-    conditions.push(eq(negotiations.advisorId, advisorId));
+  if (advisorIds && advisorIds.length > 0) {
+    conditions.push(inArray(negotiations.advisorId, advisorIds));
   }
 
   if (query.stateId) {

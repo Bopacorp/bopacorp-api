@@ -7,7 +7,7 @@ import type {
   UpdateSalesTargetRequest,
 } from '@bopacorp/shared/reports';
 import { roles, userRoles, users } from '@db/schema/auth.js';
-import { advisorSupervisors, profiles } from '@db/schema/core.js';
+import { profiles } from '@db/schema/core.js';
 import {
   businessClients,
   negotiationStateHistory,
@@ -19,6 +19,7 @@ import { reportExports, salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 // ── Sales Targets ──
@@ -102,16 +103,7 @@ async function getAdvisorIds(supervisorId?: string | undefined) {
   let advisorIds = advisorRows.map((r) => r.userId);
 
   if (supervisorId) {
-    const supervised = await db
-      .select({ advisorId: advisorSupervisors.advisorId })
-      .from(advisorSupervisors)
-      .where(
-        and(
-          eq(advisorSupervisors.supervisorId, supervisorId),
-          eq(advisorSupervisors.isActive, true)
-        )
-      );
-    const supervisedIds = new Set(supervised.map((r) => r.advisorId));
+    const supervisedIds = new Set(await getSupervisedAdvisorIds(supervisorId));
     advisorIds = advisorIds.filter((id) => supervisedIds.has(id));
   }
 

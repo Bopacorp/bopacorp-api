@@ -185,6 +185,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'negotiations.read',
     'negotiation_states.read',
 
+    'offer_matrices.read',
+
     'business_clients.read',
 
     'employees.read',

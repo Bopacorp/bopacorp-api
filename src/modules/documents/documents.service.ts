@@ -18,8 +18,9 @@ import { downloadFile } from '@lib/storage.js';
 import { createNotification } from '@modules/notifications/notifications.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
+import { getSupervisedAdvisorIds } from '@shared/utils/scoping.js';
 import { ZipArchive } from 'archiver';
-import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 
 // ── Document Types ──
 
@@ -169,7 +170,17 @@ export async function listDocuments(
   query: ListNegotiationDocumentsQuery,
   user: NonNullable<Express.Request['user']>
 ) {
-  const advisorId = user.roles.includes('advisor') ? user.id : query.advisorId;
+  let advisorIds: string[] | undefined;
+  if (user.roles.includes('advisor')) {
+    advisorIds = [user.id];
+  } else if (user.roles.includes('supervisor')) {
+    advisorIds = await getSupervisedAdvisorIds(user.id);
+    if (query.advisorId) {
+      advisorIds = advisorIds.filter((id) => id === query.advisorId);
+    }
+  } else if (query.advisorId) {
+    advisorIds = [query.advisorId];
+  }
 
   const conditions = [];
   conditions.push(isNull(negotiationDocuments.deletedAt));
@@ -190,8 +201,8 @@ export async function listDocuments(
     conditions.push(eq(negotiationDocuments.uploadedBy, query.uploadedBy));
   }
 
-  if (advisorId) {
-    conditions.push(eq(negotiations.advisorId, advisorId));
+  if (advisorIds && advisorIds.length > 0) {
+    conditions.push(inArray(negotiations.advisorId, advisorIds));
   }
 
   if (query.search) {
@@ -295,6 +306,13 @@ export async function getDocumentById(id: string, user?: NonNullable<Express.Req
 
   if (user?.roles.includes('advisor') && row.negotiation.advisorId !== user.id) {
     throw new ForbiddenError('You can only access documents from your own negotiations');
+  }
+
+  if (user?.roles.includes('supervisor')) {
+    const supervised = await getSupervisedAdvisorIds(user.id);
+    if (!supervised.includes(row.negotiation.advisorId)) {
+      throw new ForbiddenError('You can only access documents from your supervised advisors');
+    }
   }
 
   const uploader = row.uploadedBy;
@@ -516,6 +534,13 @@ export async function downloadDocument(id: string, user?: NonNullable<Express.Re
     throw new ForbiddenError('You can only access documents from your own negotiations');
   }
 
+  if (user?.roles.includes('supervisor')) {
+    const supervised = await getSupervisedAdvisorIds(user.id);
+    if (!supervised.includes(row.negotiation.advisorId)) {
+      throw new ForbiddenError('You can only access documents from your supervised advisors');
+    }
+  }
+
   if (!row.encryptionMetadata) {
     throw new ConflictError('Document is not encrypted or encryption metadata is missing');
   }
@@ -551,6 +576,13 @@ export async function downloadNegotiationDocuments(
 
   if (user.roles.includes('advisor') && negotiation.advisorId !== user.id) {
     throw new ForbiddenError('You can only access documents from your own negotiations');
+  }
+
+  if (user.roles.includes('supervisor')) {
+    const supervised = await getSupervisedAdvisorIds(user.id);
+    if (!supervised.includes(negotiation.advisorId)) {
+      throw new ForbiddenError('You can only access documents from your supervised advisors');
+    }
   }
 
   const conditions: SQL[] = [
