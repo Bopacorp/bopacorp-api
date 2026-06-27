@@ -12,10 +12,11 @@ import {
   negotiationStates,
   negotiations,
 } from '@db/schema/crm.js';
+import { salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import type { AnyColumn } from 'drizzle-orm';
-import { and, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, isNull, lte, or, sql } from 'drizzle-orm';
 import { formatDateTime, getOrderBy } from '../crm.helpers.js';
 
 function getSortColumn(sortBy?: string): AnyColumn {
@@ -51,6 +52,23 @@ export async function listNegotiations(
 
   if (query.stateId) {
     conditions.push(eq(negotiations.stateId, query.stateId));
+  }
+
+  if (query.tierCode) {
+    const [target] = await db
+      .select({ minBilling: salesTargets.minBilling, maxBilling: salesTargets.maxBilling })
+      .from(salesTargets)
+      .where(eq(salesTargets.tierCode, query.tierCode))
+      .limit(1);
+
+    if (target) {
+      conditions.push(gte(businessClients.currentMonthlyBilling, target.minBilling));
+      if (target.maxBilling !== null) {
+        conditions.push(lte(businessClients.currentMonthlyBilling, target.maxBilling));
+      }
+    } else {
+      conditions.push(sql`false`);
+    }
   }
 
   if (query.search) {
@@ -186,12 +204,27 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
     throw new NotFoundError('Advisor', data.advisorId);
   }
 
-  const state = await db.query.negotiationStates.findFirst({
-    where: eq(negotiationStates.id, data.stateId),
-  });
+  let resolvedStateId: string;
 
-  if (!state) {
-    throw new NotFoundError('Negotiation state', data.stateId);
+  if (data.stateId) {
+    const state = await db.query.negotiationStates.findFirst({
+      where: eq(negotiationStates.id, data.stateId),
+    });
+    if (!state) {
+      throw new NotFoundError('Negotiation state', data.stateId);
+    }
+    resolvedStateId = state.id;
+  } else {
+    const [firstState] = await db
+      .select({ id: negotiationStates.id })
+      .from(negotiationStates)
+      .where(eq(negotiationStates.isActive, true))
+      .orderBy(asc(negotiationStates.position))
+      .limit(1);
+    if (!firstState) {
+      throw new NotFoundError('Negotiation state', 'default');
+    }
+    resolvedStateId = firstState.id;
   }
 
   const [row] = await db
@@ -199,7 +232,7 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
     .values({
       clientId: data.clientId,
       advisorId: data.advisorId,
-      stateId: data.stateId,
+      stateId: resolvedStateId,
       startDate: data.startDate ?? new Date().toISOString().slice(0, 10),
       estimatedCloseDate: data.estimatedCloseDate ?? null,
       observations: data.observations,
@@ -213,7 +246,7 @@ export async function createNegotiation(userId: string, data: CreateNegotiationR
 
   await db.insert(negotiationStateHistory).values({
     negotiationId: row.id,
-    newStateId: data.stateId,
+    newStateId: resolvedStateId,
     changedBy: userId,
     notes: 'Initial state',
   });

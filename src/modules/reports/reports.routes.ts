@@ -1,11 +1,10 @@
 import {
   CreateReportExportRequestSchema,
-  CreateSalesObjectiveRequestSchema,
   ListAdvisorMetricsQuerySchema,
+  ListAdvisorPerformanceQuerySchema,
   ListRecentActivityQuerySchema,
   ListReportExportsQuerySchema,
-  ListSalesObjectivesQuerySchema,
-  UpdateSalesObjectiveRequestSchema,
+  UpdateSalesTargetRequestSchema,
 } from '@bopacorp/shared/reports';
 import { authenticate } from '@shared/middleware/authenticate.js';
 import { authorize } from '@shared/middleware/authorize.js';
@@ -16,46 +15,31 @@ import * as controller from './reports.controller.js';
 
 export const reportsRoutes = Router();
 
-// ── Sales Objectives ──
+// ── Sales Targets ──
 
 reportsRoutes.get(
-  '/objectives',
+  '/targets',
   authenticate,
-  authorize('sales_objectives.read'),
-  validate({ query: ListSalesObjectivesQuerySchema }),
-  controller.listObjectives
-);
-
-reportsRoutes.get(
-  '/objectives/:id',
-  authenticate,
-  authorize('sales_objectives.read'),
-  validate({ params: IdParamSchema }),
-  controller.getObjectiveById
-);
-
-reportsRoutes.post(
-  '/objectives',
-  authenticate,
-  authorize('sales_objectives.create'),
-  validate({ body: CreateSalesObjectiveRequestSchema }),
-  controller.createObjective
+  authorize('sales_targets.read'),
+  controller.listTargets
 );
 
 reportsRoutes.put(
-  '/objectives/:id',
+  '/targets/:id',
   authenticate,
-  authorize('sales_objectives.update'),
-  validate({ params: IdParamSchema, body: UpdateSalesObjectiveRequestSchema }),
-  controller.updateObjective
+  authorize('sales_targets.update'),
+  validate({ params: IdParamSchema, body: UpdateSalesTargetRequestSchema }),
+  controller.updateTarget
 );
 
-reportsRoutes.delete(
-  '/objectives/:id',
+// ── Advisor Performance ──
+
+reportsRoutes.get(
+  '/advisor-performance',
   authenticate,
-  authorize('sales_objectives.delete'),
-  validate({ params: IdParamSchema }),
-  controller.removeObjective
+  authorize('report_exports.read'),
+  validate({ query: ListAdvisorPerformanceQuerySchema }),
+  controller.getAdvisorPerformance
 );
 
 // ── Report Exports ──

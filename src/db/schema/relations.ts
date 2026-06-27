@@ -45,7 +45,7 @@ import { documentStateHistory, documentTypes, negotiationDocuments } from './doc
 import { candidateResumes, candidates, jobApplications, jobVacancies } from './employability.js';
 import { matrixAttachments, offerMatrices } from './matrices.js';
 import { notifications } from './notifications.js';
-import { reportExports, salesObjectives } from './reports.js';
+import { reportExports, salesTargets } from './reports.js';
 
 export const modulesRelations = relations(modules, ({ one, many }) => ({
   parent: one(modules, {
@@ -99,7 +99,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   uploadedDocuments: many(negotiationDocuments, { relationName: 'documentUploader' }),
   reviewedDocuments: many(negotiationDocuments, { relationName: 'documentReviewer' }),
   documentStateChanges: many(documentStateHistory),
-  createdObjectives: many(salesObjectives, { relationName: 'objectiveCreator' }),
+  createdTargets: many(salesTargets, { relationName: 'targetCreator' }),
   generatedReports: many(reportExports, { relationName: 'reportGenerator' }),
   receivedNotifications: many(notifications),
 }));
@@ -350,7 +350,6 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
   businessClients: many(businessClients),
   negotiations: many(negotiations),
   visits: many(visits),
-  assignedObjectives: many(salesObjectives),
 }));
 
 // ── Employability ──
@@ -545,15 +544,11 @@ export const documentStateHistoryRelations = relations(documentStateHistory, ({ 
 
 // ── Reports ──
 
-export const salesObjectivesRelations = relations(salesObjectives, ({ one }) => ({
+export const salesTargetsRelations = relations(salesTargets, ({ one }) => ({
   creator: one(users, {
-    fields: [salesObjectives.createdBy],
+    fields: [salesTargets.createdBy],
     references: [users.id],
-    relationName: 'objectiveCreator',
-  }),
-  advisor: one(employees, {
-    fields: [salesObjectives.advisorId],
-    references: [employees.userId],
+    relationName: 'targetCreator',
   }),
 }));
 

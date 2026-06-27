@@ -1,11 +1,10 @@
 import type {
   CreateReportExportRequest,
-  CreateSalesObjectiveRequest,
   ListAdvisorMetricsQuery,
+  ListAdvisorPerformanceQuery,
   ListRecentActivityQuery,
   ListReportExportsQuery,
-  ListSalesObjectivesQuery,
-  UpdateSalesObjectiveRequest,
+  UpdateSalesTargetRequest,
 } from '@bopacorp/shared/reports';
 import { roles, userRoles, users } from '@db/schema/auth.js';
 import { advisorSupervisors, profiles } from '@db/schema/core.js';
@@ -16,207 +15,226 @@ import {
   negotiations,
   visits,
 } from '@db/schema/crm.js';
-import { reportExports, salesObjectives } from '@db/schema/reports.js';
+import { reportExports, salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
-// ── Sales Objectives ──
+// ── Sales Targets ──
 
-export async function listObjectives(query: ListSalesObjectivesQuery) {
-  const conditions = [];
+export async function listTargets() {
+  const rows = await db
+    .select()
+    .from(salesTargets)
+    .where(eq(salesTargets.isActive, true))
+    .orderBy(desc(salesTargets.minBilling));
 
-  if (query.createdBy) {
-    conditions.push(eq(salesObjectives.createdBy, query.createdBy));
+  return {
+    data: rows.map((row) => ({
+      id: row.id,
+      tierCode: row.tierCode,
+      tierLabel: row.tierLabel,
+      minBilling: Number(row.minBilling),
+      maxBilling: row.maxBilling ? Number(row.maxBilling) : null,
+      minCloses: row.minCloses,
+      isActive: row.isActive,
+      createdAt: formatDateTime(row.createdAt),
+      updatedAt: formatDateTime(row.updatedAt),
+    })),
+  };
+}
+
+export async function updateTarget(id: string, data: UpdateSalesTargetRequest) {
+  const existing = await db.select().from(salesTargets).where(eq(salesTargets.id, id)).limit(1);
+
+  if (existing.length === 0) {
+    throw new NotFoundError('Sales target', id);
   }
 
-  if (query.advisorId) {
-    conditions.push(eq(salesObjectives.advisorId, query.advisorId));
+  const updateData: Partial<typeof salesTargets.$inferInsert> = {};
+
+  if (data.tierLabel !== undefined) updateData.tierLabel = data.tierLabel;
+  if (data.minBilling !== undefined) updateData.minBilling = data.minBilling.toString();
+  if (data.maxBilling !== undefined)
+    updateData.maxBilling = data.maxBilling !== null ? data.maxBilling.toString() : null;
+  if (data.minCloses !== undefined) updateData.minCloses = data.minCloses;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+  if (Object.keys(updateData).length > 0) {
+    updateData.updatedAt = new Date();
+    await db.update(salesTargets).set(updateData).where(eq(salesTargets.id, id));
   }
 
-  if (query.supervisorId) {
+  const [updated] = await db.select().from(salesTargets).where(eq(salesTargets.id, id));
+
+  if (!updated) {
+    throw new NotFoundError('Sales target', id);
+  }
+
+  return {
+    id: updated.id,
+    tierCode: updated.tierCode,
+    tierLabel: updated.tierLabel,
+    minBilling: Number(updated.minBilling),
+    maxBilling: updated.maxBilling ? Number(updated.maxBilling) : null,
+    minCloses: updated.minCloses,
+    isActive: updated.isActive,
+    createdAt: formatDateTime(updated.createdAt),
+    updatedAt: formatDateTime(updated.updatedAt),
+  };
+}
+
+// ── Advisor Performance ──
+
+async function getAdvisorIds(supervisorId?: string | undefined) {
+  const advisorRole = await db.query.roles.findFirst({
+    where: eq(roles.slug, 'advisor'),
+  });
+
+  if (!advisorRole) return [];
+
+  const advisorRows = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .where(eq(userRoles.roleId, advisorRole.id));
+
+  let advisorIds = advisorRows.map((r) => r.userId);
+
+  if (supervisorId) {
     const supervised = await db
       .select({ advisorId: advisorSupervisors.advisorId })
       .from(advisorSupervisors)
       .where(
         and(
-          eq(advisorSupervisors.supervisorId, query.supervisorId),
+          eq(advisorSupervisors.supervisorId, supervisorId),
           eq(advisorSupervisors.isActive, true)
         )
       );
-    const supervisedIds = supervised.map((r) => r.advisorId);
-    if (supervisedIds.length > 0) {
-      conditions.push(inArray(salesObjectives.advisorId, supervisedIds));
-    } else {
-      conditions.push(sql`false`);
-    }
+    const supervisedIds = new Set(supervised.map((r) => r.advisorId));
+    advisorIds = advisorIds.filter((id) => supervisedIds.has(id));
   }
 
-  if (query.periodStart) {
-    conditions.push(eq(salesObjectives.periodStart, query.periodStart));
-  }
-
-  if (query.periodEnd) {
-    conditions.push(eq(salesObjectives.periodEnd, query.periodEnd));
-  }
-
-  const where = conditions.length > 0 ? and(...conditions) : sql`true`;
-
-  const totalItems = await db.$count(salesObjectives, where);
-  const totalPages = Math.ceil(totalItems / query.limit);
-
-  const rows = await db
-    .select()
-    .from(salesObjectives)
-    .where(where)
-    .limit(query.limit)
-    .offset((query.page - 1) * query.limit)
-    .orderBy(salesObjectives.createdAt);
-
-  const data = await Promise.all(
-    rows.map(async (row) => {
-      const creator = await db.query.users.findFirst({
-        where: eq(users.id, row.createdBy),
-      });
-
-      const advisorUser = row.advisorId
-        ? await db.query.users.findFirst({
-            where: eq(users.id, row.advisorId),
-            with: { profile: true },
-          })
-        : null;
-
-      return {
-        id: row.id,
-        targetSalesAmount: Number(row.targetSalesAmount),
-        targetClosedDeals: row.targetClosedDeals,
-        periodStart: row.periodStart,
-        periodEnd: row.periodEnd,
-        createdBy: creator
-          ? {
-              id: creator.id,
-              username: creator.username,
-              email: creator.email,
-              profile: null,
-            }
-          : null,
-        advisor: advisorUser
-          ? {
-              id: advisorUser.id,
-              username: advisorUser.username,
-              email: advisorUser.email,
-              profile: advisorUser.profile
-                ? {
-                    firstName: advisorUser.profile.firstName,
-                    lastName: advisorUser.profile.lastName,
-                  }
-                : null,
-            }
-          : null,
-        createdAt: formatDateTime(row.createdAt),
-        updatedAt: formatDateTime(row.updatedAt),
-      };
-    })
-  );
-
-  return {
-    data,
-    meta: { page: query.page, limit: query.limit, totalItems, totalPages },
-  };
+  return advisorIds;
 }
 
-export async function getObjectiveById(id: string) {
-  const row = await db.query.salesObjectives.findFirst({
-    where: eq(salesObjectives.id, id),
-    with: {
-      creator: { with: { profile: true } },
-      advisor: { with: { user: { with: { profile: true } } } },
-    },
+export async function getAdvisorPerformance(query: ListAdvisorPerformanceQuery) {
+  const targets = await db
+    .select()
+    .from(salesTargets)
+    .where(eq(salesTargets.isActive, true))
+    .orderBy(desc(salesTargets.minBilling));
+
+  if (targets.length === 0) {
+    return { data: [] };
+  }
+
+  const advisorIds = await getAdvisorIds(query.supervisorId);
+  if (advisorIds.length === 0) {
+    return { data: [] };
+  }
+
+  const closingState = await db
+    .select({ id: negotiationStates.id })
+    .from(negotiationStates)
+    .where(and(eq(negotiationStates.code, 'closing'), eq(negotiationStates.isActive, true)))
+    .limit(1);
+
+  const closingRow = closingState[0];
+  if (!closingRow) {
+    return { data: [] };
+  }
+
+  const closingStateId = closingRow.id;
+
+  const dateConditions = [];
+  if (query.dateFrom) {
+    dateConditions.push(gte(negotiationStateHistory.createdAt, new Date(query.dateFrom)));
+  }
+  if (query.dateTo) {
+    const endOfDay = new Date(query.dateTo);
+    endOfDay.setHours(23, 59, 59, 999);
+    dateConditions.push(lte(negotiationStateHistory.createdAt, endOfDay));
+  }
+
+  const tierCaseFragments = targets.map((t) => {
+    const min = Number(t.minBilling);
+    const max = t.maxBilling ? Number(t.maxBilling) : null;
+    if (max === null) {
+      return sql`WHEN ${businessClients.currentMonthlyBilling} >= ${min} THEN ${t.tierCode}`;
+    }
+    return sql`WHEN ${businessClients.currentMonthlyBilling} >= ${min} AND ${businessClients.currentMonthlyBilling} <= ${max} THEN ${t.tierCode}`;
   });
 
-  if (!row) {
-    throw new NotFoundError('Sales objective', id);
-  }
+  const tierCaseExpr = sql`CASE ${sql.join(tierCaseFragments, sql` `)} ELSE 'UNKNOWN' END`;
 
-  return {
-    id: row.id,
-    targetSalesAmount: Number(row.targetSalesAmount),
-    targetClosedDeals: row.targetClosedDeals,
-    periodStart: row.periodStart,
-    periodEnd: row.periodEnd,
-    createdBy: row.creator
-      ? {
-          id: row.creator.id,
-          username: row.creator.username,
-          email: row.creator.email,
-          profile: row.creator.profile
-            ? {
-                firstName: row.creator.profile.firstName,
-                lastName: row.creator.profile.lastName,
-              }
-            : null,
-        }
-      : null,
-    advisor: row.advisor
-      ? {
-          id: row.advisor.userId,
-          userId: row.advisor.userId,
-          profile: row.advisor.user?.profile
-            ? {
-                firstName: row.advisor.user.profile.firstName,
-                lastName: row.advisor.user.profile.lastName,
-              }
-            : null,
-        }
-      : null,
-    createdAt: formatDateTime(row.createdAt),
-    updatedAt: formatDateTime(row.updatedAt),
-  };
-}
-
-export async function createObjective(userId: string, data: CreateSalesObjectiveRequest) {
-  const [row] = await db
-    .insert(salesObjectives)
-    .values({
-      createdBy: userId,
-      advisorId: data.advisorId,
-      targetSalesAmount: data.targetSalesAmount.toString(),
-      targetClosedDeals: data.targetClosedDeals,
-      periodStart: data.periodStart,
-      periodEnd: data.periodEnd,
+  const closedCounts = await db
+    .select({
+      advisorId: negotiations.advisorId,
+      tierCode: sql<string>`${tierCaseExpr}`.as('tier_code'),
+      count: sql<number>`count(*)::int`.as('closed_count'),
     })
-    .returning();
+    .from(negotiationStateHistory)
+    .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+    .innerJoin(businessClients, eq(negotiations.clientId, businessClients.id))
+    .where(
+      and(
+        eq(negotiationStateHistory.newStateId, closingStateId),
+        inArray(negotiations.advisorId, advisorIds),
+        isNull(negotiations.deletedAt),
+        isNull(businessClients.deletedAt),
+        ...dateConditions
+      )
+    )
+    .groupBy(negotiations.advisorId, sql`tier_code`);
 
-  if (!row) {
-    throw new Error('Failed to create sales objective');
+  const countMap = new Map<string, Map<string, number>>();
+  for (const row of closedCounts) {
+    if (!countMap.has(row.advisorId)) {
+      countMap.set(row.advisorId, new Map());
+    }
+    countMap.get(row.advisorId)?.set(row.tierCode, row.count);
   }
 
-  return getObjectiveById(row.id);
-}
+  const advisorUsers = await db.query.users.findMany({
+    where: inArray(users.id, advisorIds),
+    with: { profile: true },
+  });
 
-export async function updateObjective(id: string, data: UpdateSalesObjectiveRequest) {
-  await getObjectiveById(id);
+  const data = advisorUsers.map((user) => {
+    const advisorCounts = countMap.get(user.id);
 
-  const updateData: Partial<typeof salesObjectives.$inferInsert> = {};
+    const tiers = targets.map((t) => {
+      const closedCount = advisorCounts?.get(t.tierCode) ?? 0;
+      return {
+        tierCode: t.tierCode,
+        tierLabel: t.tierLabel,
+        closedCount,
+        minCloses: t.minCloses,
+        met: closedCount >= t.minCloses,
+      };
+    });
 
-  if (data.advisorId !== undefined) updateData.advisorId = data.advisorId;
-  if (data.targetSalesAmount !== undefined)
-    updateData.targetSalesAmount = data.targetSalesAmount.toString();
-  if (data.targetClosedDeals !== undefined) updateData.targetClosedDeals = data.targetClosedDeals;
-  if (data.periodStart !== undefined) updateData.periodStart = data.periodStart;
-  if (data.periodEnd !== undefined) updateData.periodEnd = data.periodEnd;
+    const totalClosed = tiers.reduce((sum, t) => sum + t.closedCount, 0);
+    const totalRequired = tiers.reduce((sum, t) => sum + t.minCloses, 0);
 
-  if (Object.keys(updateData).length > 0) {
-    await db.update(salesObjectives).set(updateData).where(eq(salesObjectives.id, id));
-  }
+    return {
+      advisor: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        profile: user.profile
+          ? { firstName: user.profile.firstName, lastName: user.profile.lastName }
+          : null,
+      },
+      tiers,
+      totalClosed,
+      totalRequired,
+      overallMet: tiers.every((t) => t.met),
+    };
+  });
 
-  return getObjectiveById(id);
-}
-
-export async function removeObjective(id: string) {
-  await getObjectiveById(id);
-  await db.delete(salesObjectives).where(eq(salesObjectives.id, id));
+  return { data };
 }
 
 // ── Report Exports ──
@@ -352,34 +370,7 @@ function buildDateRangeConditions(
 }
 
 export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
-  const advisorRole = await db.query.roles.findFirst({
-    where: eq(roles.slug, 'advisor'),
-  });
-
-  if (!advisorRole) {
-    return { data: [] };
-  }
-
-  const advisorRows = await db
-    .select({ userId: userRoles.userId })
-    .from(userRoles)
-    .where(eq(userRoles.roleId, advisorRole.id));
-
-  let advisorIds = advisorRows.map((r) => r.userId);
-
-  if (query.supervisorId) {
-    const supervised = await db
-      .select({ advisorId: advisorSupervisors.advisorId })
-      .from(advisorSupervisors)
-      .where(
-        and(
-          eq(advisorSupervisors.supervisorId, query.supervisorId),
-          eq(advisorSupervisors.isActive, true)
-        )
-      );
-    const supervisedIds = new Set(supervised.map((r) => r.advisorId));
-    advisorIds = advisorIds.filter((id) => supervisedIds.has(id));
-  }
+  let advisorIds = await getAdvisorIds(query.supervisorId);
 
   if (query.advisorId) {
     advisorIds = advisorIds.filter((id) => id === query.advisorId);

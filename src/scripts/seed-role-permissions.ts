@@ -55,7 +55,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'employees.read',
 
     'report_exports.read',
-    'sales_objectives.read',
+    'sales_targets.read',
   ],
 
   supervisor: [
@@ -99,7 +99,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'report_exports.read',
     'report_exports.create',
 
-    'sales_objectives.read',
+    'sales_targets.read',
 
     'users.read',
 
@@ -148,10 +148,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'report_exports.read',
     'report_exports.create',
 
-    'sales_objectives.create',
-    'sales_objectives.read',
-    'sales_objectives.update',
-    'sales_objectives.delete',
+    'sales_targets.read',
+    'sales_targets.update',
 
     'users.read',
 
