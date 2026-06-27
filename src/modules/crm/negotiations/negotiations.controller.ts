@@ -5,6 +5,7 @@ import type {
   ListNegotiationsQuery,
   UpdateNegotiationRequest,
 } from '@bopacorp/shared/crm';
+import { downloadNegotiationDocuments } from '@modules/documents/documents.service.js';
 import { BadRequestError, UnauthorizedError } from '@shared/errors/http-error.js';
 import { ValidationError } from '@shared/middleware/validate.js';
 import type { Request, Response } from 'express';
@@ -94,4 +95,20 @@ export async function closeWithDocuments(req: Request<{ id: string }>, res: Resp
   );
 
   res.json({ success: true, data });
+}
+
+export async function downloadDocuments(req: Request<{ id: string }>, res: Response) {
+  if (!req.user) throw new UnauthorizedError('Authentication required');
+
+  const status = typeof req.query['status'] === 'string' ? req.query['status'] : undefined;
+  const { archive, negotiationId } = await downloadNegotiationDocuments(
+    req.params.id,
+    req.user,
+    status
+  );
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="documentos_${negotiationId}.zip"`);
+
+  archive.pipe(res);
 }

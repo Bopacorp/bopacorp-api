@@ -78,3 +78,11 @@ negotiationsRoutes.post(
   uploadMultipleClosingDocuments,
   controller.closeWithDocuments
 );
+
+negotiationsRoutes.get(
+  '/:id/documents/download',
+  authenticate,
+  authorize('negotiation_documents.read'),
+  validate({ params: IdParamSchema }),
+  controller.downloadDocuments
+);

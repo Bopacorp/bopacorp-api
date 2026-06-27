@@ -9,8 +9,8 @@ import type {
   UpdateNegotiationDocumentRequest,
 } from '@bopacorp/shared/documents';
 import { env } from '@config/env.js';
-import { users } from '@db/schema/auth.js';
-import { negotiations } from '@db/schema/crm.js';
+import { roles, userRoles, users } from '@db/schema/auth.js';
+import { businessClients, negotiations } from '@db/schema/crm.js';
 import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/schema/documents.js';
 import { db } from '@lib/db.js';
 import { decryptBuffer } from '@lib/encryption.js';
@@ -18,6 +18,7 @@ import { downloadFile } from '@lib/storage.js';
 import { createNotification } from '@modules/notifications/notifications.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
+import { ZipArchive } from 'archiver';
 import { and, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
 
 // ── Document Types ──
@@ -384,6 +385,26 @@ export async function createDocument(userId: string, data: CreateNegotiationDocu
     notes: 'Document uploaded',
   });
 
+  const client = await db.query.businessClients.findFirst({
+    where: eq(businessClients.id, negotiation.clientId),
+  });
+
+  const coordinators = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(and(eq(roles.slug, 'coordinator'), eq(userRoles.isActive, true)));
+
+  for (const coord of coordinators) {
+    await createNotification({
+      recipientId: coord.userId,
+      title: 'Documento por revisar',
+      message: `${client?.businessName ?? 'Cliente'} - ${documentType.name}`,
+      referenceType: 'document',
+      referenceId: row.id,
+    });
+  }
+
   return getDocumentById(row.id);
 }
 
@@ -471,7 +492,7 @@ export async function changeDocumentState(
       await createNotification({
         recipientId: negotiation.advisorId,
         title: `Documento ${stateLabel}`,
-        message: `${document.documentType.name} para ${document.negotiation.client.businessName} fue ${stateLabel}.${data.coordinatorMessage ? ` ${data.coordinatorMessage}` : ''}`,
+        message: `${document.negotiation.client.businessName} - ${document.documentType.name}`,
         referenceType: 'document',
         referenceId: id,
       });
@@ -512,6 +533,62 @@ export async function downloadDocument(id: string, user?: NonNullable<Express.Re
     filename: row.filename,
     mimeType: row.mimeType,
   };
+}
+
+export async function downloadNegotiationDocuments(
+  negotiationId: string,
+  user: NonNullable<Express.Request['user']>,
+  status?: string
+) {
+  const negotiation = await db.query.negotiations.findFirst({
+    where: eq(negotiations.id, negotiationId),
+    with: { client: true },
+  });
+
+  if (!negotiation) {
+    throw new NotFoundError('Negotiation', negotiationId);
+  }
+
+  if (user.roles.includes('advisor') && negotiation.advisorId !== user.id) {
+    throw new ForbiddenError('You can only access documents from your own negotiations');
+  }
+
+  const conditions: SQL[] = [
+    eq(negotiationDocuments.negotiationId, negotiationId),
+    isNull(negotiationDocuments.deletedAt),
+  ];
+
+  if (status === 'PENDING_APPROVAL' || status === 'ACCEPTED' || status === 'REJECTED') {
+    conditions.push(eq(negotiationDocuments.state, status));
+  }
+
+  const docs = await db.query.negotiationDocuments.findMany({
+    where: and(...conditions),
+    with: { documentType: true },
+  });
+
+  if (docs.length === 0) {
+    throw new NotFoundError('Documents for negotiation', negotiationId);
+  }
+
+  const archive = new ZipArchive({ zlib: { level: 5 } });
+
+  for (const doc of docs) {
+    if (!doc.encryptionMetadata) continue;
+
+    const encryptedBody = await downloadFile(doc.storagePath, env.DOCUMENTS_STORAGE_BUCKET);
+    if (!encryptedBody) continue;
+
+    const encryptedBuffer = Buffer.from(await encryptedBody.transformToByteArray());
+    const buffer = decryptBuffer(encryptedBuffer, doc.encryptionMetadata);
+
+    const zipFilename = `${doc.documentType.name}_${doc.filename}`;
+    archive.append(buffer, { name: zipFilename });
+  }
+
+  archive.finalize();
+
+  return { archive, negotiationId };
 }
 
 // ── Document State History ──

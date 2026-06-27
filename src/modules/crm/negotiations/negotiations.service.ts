@@ -5,7 +5,7 @@ import type {
   UpdateNegotiationRequest,
 } from '@bopacorp/shared/crm';
 import { env } from '@config/env.js';
-import { users } from '@db/schema/auth.js';
+import { roles, userRoles, users } from '@db/schema/auth.js';
 import { employees, profiles } from '@db/schema/core.js';
 import {
   businessClients,
@@ -19,6 +19,7 @@ import { salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { deleteFile } from '@lib/storage.js';
 import { uploadEncryptedDocument } from '@modules/document-uploads/document-uploads.service.js';
+import { createNotification } from '@modules/notifications/notifications.service.js';
 import {
   BadRequestError,
   ConflictError,
@@ -533,6 +534,22 @@ export async function closeWithDocuments(
       uploadedPaths.map((path) => deleteFile(path, env.DOCUMENTS_STORAGE_BUCKET))
     );
     throw error;
+  }
+
+  const coordinators = await db
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(and(eq(roles.slug, 'coordinator'), eq(userRoles.isActive, true)));
+
+  for (const coord of coordinators) {
+    await createNotification({
+      recipientId: coord.userId,
+      title: 'Documentos por revisar',
+      message: `${negotiation.client.businessName} - ${files.length} documento(s)`,
+      referenceType: 'negotiation',
+      referenceId: negotiationId,
+    });
   }
 
   return getNegotiationById(negotiationId);
