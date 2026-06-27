@@ -98,6 +98,13 @@ export async function changeDocumentState(req: Request<{ id: string }>, res: Res
   res.json({ success: true, data });
 }
 
+// ── Pending Summary ──
+
+export async function getPendingSummary(_req: Request, res: Response) {
+  const data = await service.getPendingSummary();
+  res.json({ success: true, data });
+}
+
 // ── Document State History ──
 
 export async function listDocumentHistory(req: Request<{ id: string }>, res: Response) {

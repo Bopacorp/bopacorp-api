@@ -576,19 +576,81 @@ export async function downloadNegotiationDocuments(
   for (const doc of docs) {
     if (!doc.encryptionMetadata) continue;
 
-    const encryptedBody = await downloadFile(doc.storagePath, env.DOCUMENTS_STORAGE_BUCKET);
-    if (!encryptedBody) continue;
+    try {
+      const encryptedBody = await downloadFile(doc.storagePath, env.DOCUMENTS_STORAGE_BUCKET);
+      if (!encryptedBody) continue;
 
-    const encryptedBuffer = Buffer.from(await encryptedBody.transformToByteArray());
-    const buffer = decryptBuffer(encryptedBuffer, doc.encryptionMetadata);
+      const encryptedBuffer = Buffer.from(await encryptedBody.transformToByteArray());
+      const buffer = decryptBuffer(encryptedBuffer, doc.encryptionMetadata);
 
-    const zipFilename = `${doc.documentType.name}_${doc.filename}`;
-    archive.append(buffer, { name: zipFilename });
+      const zipFilename = `${doc.documentType.name}_${doc.filename}`;
+      archive.append(buffer, { name: zipFilename });
+    } catch {}
   }
 
   archive.finalize();
 
   return { archive, negotiationId };
+}
+
+// ── Pending Summary ──
+
+export async function getPendingSummary() {
+  const rows = await db.execute<{
+    advisor_id: string;
+    first_name: string;
+    last_name: string;
+    pending_upload: number;
+    pending_review: number;
+  }>(sql`
+    WITH active_negotiations AS (
+      SELECT n.id, n.advisor_id
+      FROM crm.negotiations n
+      INNER JOIN crm.negotiation_states ns ON ns.id = n.state_id
+      WHERE n.is_active = true AND n.deleted_at IS NULL AND ns.position IN (1, 2, 3)
+    ),
+    mandatory_types AS (
+      SELECT id FROM documents.document_types
+      WHERE is_mandatory = true AND is_active = true
+    ),
+    pending_upload AS (
+      SELECT an.advisor_id, count(*) AS cnt
+      FROM active_negotiations an
+      CROSS JOIN mandatory_types mt
+      WHERE NOT EXISTS (
+        SELECT 1 FROM documents.negotiation_documents nd
+        WHERE nd.negotiation_id = an.id AND nd.document_type_id = mt.id AND nd.deleted_at IS NULL
+      )
+      GROUP BY an.advisor_id
+    ),
+    pending_review AS (
+      SELECT an.advisor_id, count(*) AS cnt
+      FROM documents.negotiation_documents nd
+      INNER JOIN active_negotiations an ON an.id = nd.negotiation_id
+      WHERE nd.state = 'PENDING_APPROVAL' AND nd.deleted_at IS NULL
+      GROUP BY an.advisor_id
+    )
+    SELECT
+      coalesce(pu.advisor_id, pr.advisor_id) AS advisor_id,
+      p.first_name, p.last_name,
+      cast(coalesce(pu.cnt, 0) AS int) AS pending_upload,
+      cast(coalesce(pr.cnt, 0) AS int) AS pending_review
+    FROM pending_upload pu
+    FULL OUTER JOIN pending_review pr ON pu.advisor_id = pr.advisor_id
+    INNER JOIN core.profiles p ON p.user_id = coalesce(pu.advisor_id, pr.advisor_id)
+    ORDER BY (coalesce(pu.cnt, 0) + coalesce(pr.cnt, 0)) DESC
+  `);
+
+  return rows.rows.map((row) => ({
+    advisor: {
+      id: row.advisor_id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+    },
+    pendingUpload: row.pending_upload,
+    pendingReview: row.pending_review,
+    totalPending: row.pending_upload + row.pending_review,
+  }));
 }
 
 // ── Document State History ──

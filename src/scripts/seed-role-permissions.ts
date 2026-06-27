@@ -183,6 +183,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document_types.delete',
 
     'negotiations.read',
+    'negotiation_states.read',
 
     'business_clients.read',
 

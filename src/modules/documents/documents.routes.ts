@@ -59,6 +59,15 @@ documentsRoutes.delete(
   controller.removeDocumentType
 );
 
+// ── Pending Summary ──
+
+documentsRoutes.get(
+  '/pending-summary',
+  authenticate,
+  authorize('negotiation_documents.read'),
+  controller.getPendingSummary
+);
+
 // ── Negotiation Documents ──
 
 documentsRoutes.get(
