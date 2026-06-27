@@ -76,7 +76,7 @@ export async function listCatalogItems(query: ListCatalogItemsQuery) {
       imagePath: catalogItems.imagePath,
       isActive: catalogItems.isActive,
       isPublished: catalogItems.isPublished,
-      category: { id: categories.id, name: categories.name },
+      category: { id: categories.id, name: categories.name, slug: categories.slug },
       itemType: { id: itemTypes.id, name: itemTypes.name },
       contractType: { id: contractTypes.id, name: contractTypes.name },
       createdAt: catalogItems.createdAt,
@@ -144,8 +144,9 @@ export async function getCatalogItemById(id: string) {
       ? {
           id: item.category.id,
           name: item.category.name,
+          slug: item.category.slug,
         }
-      : { id: '', name: '' },
+      : { id: '', name: '', slug: '' },
     itemType: item.itemType
       ? {
           id: item.itemType.id,

@@ -45,6 +45,13 @@ function buildHeroBlocks(textId: string): CreateContentBlockRequest[] {
       sortOrder: 30,
     },
     {
+      contentKey: 'hero.background_image_url',
+      contentTypeId: textId,
+      title: 'Fondo del hero (Landing)',
+      body: '',
+      sortOrder: 35,
+    },
+    {
       contentKey: 'hero.cta_primary_label',
       contentTypeId: textId,
       title: 'Hero - CTA Primario',
@@ -83,6 +90,13 @@ function buildAboutBlocks(textId: string): CreateContentBlockRequest[] {
       title: 'About - Descripción',
       body: 'Como Partner de una de las empresas de telecomunicaciones más grandes de Ecuador, en Bohorquez & Pauta Corp (Bopacorp S.A.) innovamos desde nuestra matriz en Guayaquil para brindar soluciones integradas de conectividad, equipos informáticos y tecnología celular a nivel nacional.',
       sortOrder: 130,
+    },
+    {
+      contentKey: 'about.image_url',
+      contentTypeId: textId,
+      title: 'Imagen seccion About (Landing)',
+      body: '',
+      sortOrder: 135,
     },
     {
       contentKey: 'about.feature_1_title',

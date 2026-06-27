@@ -42,3 +42,8 @@ export async function deleteContentBlock(req: Request<{ id: string }>, res: Resp
   await service.deleteContentBlock(req.params.id);
   res.json({ success: true, data: null });
 }
+
+export async function listSections(_req: Request, res: Response) {
+  const data = await service.listSections();
+  res.json({ success: true, data });
+}

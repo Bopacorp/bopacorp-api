@@ -12,7 +12,7 @@ import {
   InternalServerError,
   NotFoundError,
 } from '@shared/errors/http-error.js';
-import { and, asc, desc, eq, ilike, isNull, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { isValidImageBody } from '../catalog.helpers.js';
 import { getContentTypeById } from '../content-types/content-types.service.js';
 
@@ -83,6 +83,10 @@ export async function listContentBlocks(query: ListContentBlocksQuery) {
 
   if (query.contentTypeId) {
     conditions.push(eq(contentBlocks.contentTypeId, query.contentTypeId));
+  }
+
+  if (query.section) {
+    conditions.push(ilike(contentBlocks.contentKey, `${query.section}.%`));
   }
 
   if (query.search) {
@@ -241,4 +245,17 @@ export async function deleteContentBlock(id: string) {
   await getContentBlockById(id);
 
   await db.update(contentBlocks).set({ deletedAt: new Date() }).where(eq(contentBlocks.id, id));
+}
+
+export async function listSections() {
+  const prefix = sql<string>`split_part(${contentBlocks.contentKey}, '.', 1)`.as('prefix');
+
+  const rows = await db
+    .select({ prefix, count: count() })
+    .from(contentBlocks)
+    .where(isNull(contentBlocks.deletedAt))
+    .groupBy(prefix)
+    .orderBy(asc(prefix));
+
+  return rows.map((r) => ({ prefix: r.prefix, count: r.count }));
 }
