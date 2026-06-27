@@ -2,6 +2,7 @@ import {
   CreateReportExportRequestSchema,
   CreateSalesObjectiveRequestSchema,
   ListAdvisorMetricsQuerySchema,
+  ListRecentActivityQuerySchema,
   ListReportExportsQuerySchema,
   ListSalesObjectivesQuerySchema,
   UpdateSalesObjectiveRequestSchema,
@@ -91,4 +92,14 @@ reportsRoutes.get(
   authorize('report_exports.read'),
   validate({ query: ListAdvisorMetricsQuerySchema }),
   controller.listAdvisorMetrics
+);
+
+// ── Recent Activity ──
+
+reportsRoutes.get(
+  '/recent-activity',
+  authenticate,
+  authorize('report_exports.read'),
+  validate({ query: ListRecentActivityQuerySchema }),
+  controller.listRecentActivity
 );

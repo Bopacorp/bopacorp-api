@@ -2,18 +2,25 @@ import type {
   CreateReportExportRequest,
   CreateSalesObjectiveRequest,
   ListAdvisorMetricsQuery,
+  ListRecentActivityQuery,
   ListReportExportsQuery,
   ListSalesObjectivesQuery,
   UpdateSalesObjectiveRequest,
 } from '@bopacorp/shared/reports';
 import { roles, userRoles, users } from '@db/schema/auth.js';
-import { employees } from '@db/schema/core.js';
-import { businessClients, negotiationStates, negotiations, visits } from '@db/schema/crm.js';
+import { advisorSupervisors, employees, profiles } from '@db/schema/core.js';
+import {
+  businessClients,
+  negotiationStateHistory,
+  negotiationStates,
+  negotiations,
+  visits,
+} from '@db/schema/crm.js';
 import { reportExports, salesObjectives } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
 import { NotFoundError } from '@shared/errors/http-error.js';
 import { formatDateTime } from '@shared/utils/format.js';
-import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 // ── Sales Objectives ──
 
@@ -330,7 +337,21 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
     .from(userRoles)
     .where(eq(userRoles.roleId, advisorRole.id));
 
-  const advisorIds = advisorRows.map((r) => r.userId);
+  let advisorIds = advisorRows.map((r) => r.userId);
+
+  if (query.supervisorId) {
+    const supervised = await db
+      .select({ advisorId: advisorSupervisors.advisorId })
+      .from(advisorSupervisors)
+      .where(
+        and(
+          eq(advisorSupervisors.supervisorId, query.supervisorId),
+          eq(advisorSupervisors.isActive, true)
+        )
+      );
+    const supervisedIds = new Set(supervised.map((r) => r.advisorId));
+    advisorIds = advisorIds.filter((id) => supervisedIds.has(id));
+  }
 
   if (advisorIds.length === 0) {
     return { data: [] };
@@ -411,6 +432,25 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
     ])
   );
 
+  const closingDaysRows = await db
+    .select({
+      advisorId: negotiations.advisorId,
+      avgDays: sql<number>`round(avg(extract(epoch from (${negotiationStateHistory.createdAt} - ${negotiations.createdAt})) / 86400)::numeric, 1)`,
+    })
+    .from(negotiationStateHistory)
+    .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+    .where(
+      and(
+        eq(negotiationStateHistory.newStateId, stateIds.closing),
+        inArray(negotiations.advisorId, advisorIds),
+        isNull(negotiations.deletedAt),
+        ...negotiationDateConditions
+      )
+    )
+    .groupBy(negotiations.advisorId);
+
+  const closingDaysMap = new Map(closingDaysRows.map((r) => [r.advisorId, Number(r.avgDays)]));
+
   const data = advisorIds
     .map((advisorId) => {
       const user = userMap.get(advisorId);
@@ -435,9 +475,123 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
         totalBilledAmount: billing.billed,
         averageBillingPerService:
           billing.services > 0 ? Math.round((billing.billed / billing.services) * 100) / 100 : 0,
+        avgDaysToClose: closingDaysMap.get(advisorId) ?? null,
       };
     })
     .filter(Boolean);
 
   return { data };
+}
+
+// ── Recent Activity ──
+
+interface DateRangeFilter {
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
+}
+
+function buildTimestampRangeConditions(
+  filter: DateRangeFilter,
+  dateColumn: typeof negotiationStateHistory.createdAt | typeof visits.createdAt
+) {
+  const conditions = [];
+  if (filter.dateFrom) {
+    conditions.push(gte(dateColumn, new Date(filter.dateFrom)));
+  }
+  if (filter.dateTo) {
+    const endOfDay = new Date(filter.dateTo);
+    endOfDay.setHours(23, 59, 59, 999);
+    conditions.push(lte(dateColumn, endOfDay));
+  }
+  return conditions;
+}
+
+export async function listRecentActivity(query: ListRecentActivityQuery) {
+  const stateChangeConditions = [
+    ...buildTimestampRangeConditions(query, negotiationStateHistory.createdAt),
+  ];
+
+  const visitConditions = [
+    isNull(visits.deletedAt),
+    ...buildTimestampRangeConditions(query, visits.createdAt),
+  ];
+
+  if (query.advisorId) {
+    stateChangeConditions.push(eq(negotiations.advisorId, query.advisorId));
+    visitConditions.push(eq(visits.advisorId, query.advisorId));
+  }
+
+  const prevState = db
+    .select({ id: negotiationStates.id, name: negotiationStates.name })
+    .from(negotiationStates)
+    .as('prev_state');
+
+  const newState = db
+    .select({ id: negotiationStates.id, name: negotiationStates.name })
+    .from(negotiationStates)
+    .as('new_state');
+
+  const stateChanges = await db
+    .select({
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
+      clientName: businessClients.businessName,
+      prevStateName: prevState.name,
+      newStateName: newState.name,
+      createdAt: negotiationStateHistory.createdAt,
+    })
+    .from(negotiationStateHistory)
+    .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+    .innerJoin(businessClients, eq(negotiations.clientId, businessClients.id))
+    .innerJoin(profiles, eq(negotiations.advisorId, profiles.userId))
+    .innerJoin(newState, eq(negotiationStateHistory.newStateId, newState.id))
+    .leftJoin(prevState, eq(negotiationStateHistory.previousStateId, prevState.id))
+    .where(and(isNull(negotiations.deletedAt), ...stateChangeConditions))
+    .orderBy(desc(negotiationStateHistory.createdAt))
+    .limit(query.limit * 2);
+
+  const visitRows = await db
+    .select({
+      advisorFirstName: profiles.firstName,
+      advisorLastName: profiles.lastName,
+      clientName: businessClients.businessName,
+      createdAt: visits.createdAt,
+    })
+    .from(visits)
+    .innerJoin(businessClients, eq(visits.clientId, businessClients.id))
+    .innerJoin(profiles, eq(visits.advisorId, profiles.userId))
+    .where(and(...visitConditions))
+    .orderBy(desc(visits.createdAt))
+    .limit(query.limit * 2);
+
+  const combined = [
+    ...stateChanges.map((r) => ({
+      type: 'state_change' as const,
+      advisorName: `${r.advisorFirstName} ${r.advisorLastName}`,
+      clientName: r.clientName,
+      description: r.prevStateName
+        ? `${r.prevStateName} -> ${r.newStateName}`
+        : `${r.newStateName}`,
+      createdAt: formatDateTime(r.createdAt),
+    })),
+    ...visitRows.map((r) => ({
+      type: 'visit' as const,
+      advisorName: `${r.advisorFirstName} ${r.advisorLastName}`,
+      clientName: r.clientName,
+      description: 'Visited client',
+      createdAt: formatDateTime(r.createdAt),
+    })),
+  ];
+
+  combined.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const totalItems = combined.length;
+  const totalPages = Math.ceil(totalItems / query.limit);
+  const offset = (query.page - 1) * query.limit;
+  const data = combined.slice(offset, offset + query.limit);
+
+  return {
+    data,
+    meta: { page: query.page, limit: query.limit, totalItems, totalPages },
+  };
 }

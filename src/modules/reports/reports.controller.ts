@@ -2,6 +2,7 @@ import type {
   CreateReportExportRequest,
   CreateSalesObjectiveRequest,
   ListAdvisorMetricsQuery,
+  ListRecentActivityQuery,
   ListReportExportsQuery,
   ListSalesObjectivesQuery,
   UpdateSalesObjectiveRequest,
@@ -82,4 +83,12 @@ export async function listAdvisorMetrics(req: Request, res: Response) {
   const query = req.query as unknown as ListAdvisorMetricsQuery;
   const result = await service.listAdvisorMetrics(query);
   res.json({ success: true, data: result.data });
+}
+
+// ── Recent Activity ──
+
+export async function listRecentActivity(req: Request, res: Response) {
+  const query = req.query as unknown as ListRecentActivityQuery;
+  const result = await service.listRecentActivity(query);
+  res.json({ success: true, data: result.data, meta: result.meta });
 }
