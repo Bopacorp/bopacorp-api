@@ -8,7 +8,7 @@ import type {
   UpdateSalesObjectiveRequest,
 } from '@bopacorp/shared/reports';
 import { roles, userRoles, users } from '@db/schema/auth.js';
-import { advisorSupervisors, employees, profiles } from '@db/schema/core.js';
+import { advisorSupervisors, profiles } from '@db/schema/core.js';
 import {
   businessClients,
   negotiationStateHistory,
@@ -62,10 +62,10 @@ export async function listObjectives(query: ListSalesObjectivesQuery) {
         where: eq(users.id, row.createdBy),
       });
 
-      const advisor = row.advisorId
-        ? await db.query.employees.findFirst({
-            where: eq(employees.userId, row.advisorId),
-            with: { user: { with: { profile: true } } },
+      const advisorUser = row.advisorId
+        ? await db.query.users.findFirst({
+            where: eq(users.id, row.advisorId),
+            with: { profile: true },
           })
         : null;
 
@@ -83,14 +83,15 @@ export async function listObjectives(query: ListSalesObjectivesQuery) {
               profile: null,
             }
           : null,
-        advisor: advisor
+        advisor: advisorUser
           ? {
-              id: advisor.userId,
-              userId: advisor.userId,
-              profile: advisor.user?.profile
+              id: advisorUser.id,
+              username: advisorUser.username,
+              email: advisorUser.email,
+              profile: advisorUser.profile
                 ? {
-                    firstName: advisor.user.profile.firstName,
-                    lastName: advisor.user.profile.lastName,
+                    firstName: advisorUser.profile.firstName,
+                    lastName: advisorUser.profile.lastName,
                   }
                 : null,
             }
@@ -110,7 +111,10 @@ export async function listObjectives(query: ListSalesObjectivesQuery) {
 export async function getObjectiveById(id: string) {
   const row = await db.query.salesObjectives.findFirst({
     where: eq(salesObjectives.id, id),
-    with: { creator: true, advisor: true },
+    with: {
+      creator: { with: { profile: true } },
+      advisor: { with: { user: { with: { profile: true } } } },
+    },
   });
 
   if (!row) {
@@ -128,14 +132,24 @@ export async function getObjectiveById(id: string) {
           id: row.creator.id,
           username: row.creator.username,
           email: row.creator.email,
-          profile: null,
+          profile: row.creator.profile
+            ? {
+                firstName: row.creator.profile.firstName,
+                lastName: row.creator.profile.lastName,
+              }
+            : null,
         }
       : null,
     advisor: row.advisor
       ? {
           id: row.advisor.userId,
           userId: row.advisor.userId,
-          profile: null,
+          profile: row.advisor.user?.profile
+            ? {
+                firstName: row.advisor.user.profile.firstName,
+                lastName: row.advisor.user.profile.lastName,
+              }
+            : null,
         }
       : null,
     createdAt: formatDateTime(row.createdAt),
@@ -300,10 +314,6 @@ export async function createExport(userId: string, data: CreateReportExportReque
 
 // ── Advisor Metrics ──
 
-const ADVISOR_STATE_CODES = ['initial_contact', 'negotiation', 'closing', 'post_sale'] as const;
-
-type AdvisorStateCode = (typeof ADVISOR_STATE_CODES)[number];
-
 function buildDateRangeConditions(
   query: ListAdvisorMetricsQuery,
   dateColumn: typeof negotiations.createdAt | typeof visits.visitDate
@@ -353,18 +363,26 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
     advisorIds = advisorIds.filter((id) => supervisedIds.has(id));
   }
 
+  if (query.advisorId) {
+    advisorIds = advisorIds.filter((id) => id === query.advisorId);
+  }
+
   if (advisorIds.length === 0) {
     return { data: [] };
   }
 
-  const stateRows = await db
-    .select()
+  const allStates = await db
+    .select({
+      id: negotiationStates.id,
+      code: negotiationStates.code,
+      name: negotiationStates.name,
+      position: negotiationStates.position,
+    })
     .from(negotiationStates)
-    .where(inArray(negotiationStates.code, [...ADVISOR_STATE_CODES]));
+    .where(eq(negotiationStates.isActive, true))
+    .orderBy(negotiationStates.position);
 
-  const stateIds = Object.fromEntries(
-    stateRows.map((state) => [state.code as AdvisorStateCode, state.id])
-  ) as Record<AdvisorStateCode, string>;
+  const closingState = allStates.find((s) => s.code === 'closing');
 
   const advisorUsers = await db.query.users.findMany({
     where: inArray(users.id, advisorIds),
@@ -386,7 +404,6 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
       and(
         inArray(negotiations.advisorId, advisorIds),
         isNull(negotiations.deletedAt),
-        inArray(negotiations.stateId, Object.values(stateIds)),
         ...negotiationDateConditions
       )
     )
@@ -432,24 +449,27 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
     ])
   );
 
-  const closingDaysRows = await db
-    .select({
-      advisorId: negotiations.advisorId,
-      avgDays: sql<number>`round(avg(extract(epoch from (${negotiationStateHistory.createdAt} - ${negotiations.createdAt})) / 86400)::numeric, 1)`,
-    })
-    .from(negotiationStateHistory)
-    .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
-    .where(
-      and(
-        eq(negotiationStateHistory.newStateId, stateIds.closing),
-        inArray(negotiations.advisorId, advisorIds),
-        isNull(negotiations.deletedAt),
-        ...negotiationDateConditions
+  let closingDaysMap = new Map<string, number>();
+  if (closingState) {
+    const closingDaysRows = await db
+      .select({
+        advisorId: negotiations.advisorId,
+        avgDays: sql<number>`round(avg(extract(epoch from (${negotiationStateHistory.createdAt} - ${negotiations.createdAt})) / 86400)::numeric, 1)`,
+      })
+      .from(negotiationStateHistory)
+      .innerJoin(negotiations, eq(negotiationStateHistory.negotiationId, negotiations.id))
+      .where(
+        and(
+          eq(negotiationStateHistory.newStateId, closingState.id),
+          inArray(negotiations.advisorId, advisorIds),
+          isNull(negotiations.deletedAt),
+          ...negotiationDateConditions
+        )
       )
-    )
-    .groupBy(negotiations.advisorId);
+      .groupBy(negotiations.advisorId);
 
-  const closingDaysMap = new Map(closingDaysRows.map((r) => [r.advisorId, Number(r.avgDays)]));
+    closingDaysMap = new Map(closingDaysRows.map((r) => [r.advisorId, Number(r.avgDays)]));
+  }
 
   const data = advisorIds
     .map((advisorId) => {
@@ -459,6 +479,13 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
       const negCounts = negCountMap.get(advisorId);
       const billing = billingMap.get(advisorId) ?? { billed: 0, services: 0 };
 
+      const stateCounts = allStates.map((state) => ({
+        stateId: state.id,
+        stateCode: state.code,
+        stateName: state.name,
+        count: negCounts?.get(state.id) ?? 0,
+      }));
+
       return {
         advisor: {
           id: user.id,
@@ -467,10 +494,7 @@ export async function listAdvisorMetrics(query: ListAdvisorMetricsQuery) {
             ? { firstName: user.profile.firstName, lastName: user.profile.lastName }
             : null,
         },
-        clientsContacted: negCounts?.get(stateIds.initial_contact) ?? 0,
-        clientsInNegotiation: negCounts?.get(stateIds.negotiation) ?? 0,
-        clientsClosed: negCounts?.get(stateIds.closing) ?? 0,
-        clientsPostSale: negCounts?.get(stateIds.post_sale) ?? 0,
+        stateCounts,
         clientsVisited: visitMap.get(advisorId) ?? 0,
         totalBilledAmount: billing.billed,
         averageBillingPerService:
