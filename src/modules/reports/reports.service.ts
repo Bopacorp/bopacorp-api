@@ -35,6 +35,24 @@ export async function listObjectives(query: ListSalesObjectivesQuery) {
     conditions.push(eq(salesObjectives.advisorId, query.advisorId));
   }
 
+  if (query.supervisorId) {
+    const supervised = await db
+      .select({ advisorId: advisorSupervisors.advisorId })
+      .from(advisorSupervisors)
+      .where(
+        and(
+          eq(advisorSupervisors.supervisorId, query.supervisorId),
+          eq(advisorSupervisors.isActive, true)
+        )
+      );
+    const supervisedIds = supervised.map((r) => r.advisorId);
+    if (supervisedIds.length > 0) {
+      conditions.push(inArray(salesObjectives.advisorId, supervisedIds));
+    } else {
+      conditions.push(sql`false`);
+    }
+  }
+
   if (query.periodStart) {
     conditions.push(eq(salesObjectives.periodStart, query.periodStart));
   }
