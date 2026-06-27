@@ -1,11 +1,14 @@
+import { UuidSchema } from '@bopacorp/shared/common';
 import type {
   ChangeNegotiationStateRequest,
   CreateNegotiationRequest,
   ListNegotiationsQuery,
   UpdateNegotiationRequest,
 } from '@bopacorp/shared/crm';
-import { UnauthorizedError } from '@shared/errors/http-error.js';
+import { BadRequestError, UnauthorizedError } from '@shared/errors/http-error.js';
+import { ValidationError } from '@shared/middleware/validate.js';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import * as service from './negotiations.service.js';
 
 export async function listNegotiations(req: Request, res: Response) {
@@ -52,5 +55,43 @@ export async function changeNegotiationState(req: Request<{ id: string }>, res: 
 
 export async function getNegotiationHistory(req: Request<{ id: string }>, res: Response) {
   const data = await service.getNegotiationHistory(req.params.id);
+  res.json({ success: true, data });
+}
+
+const CloseWithDocumentsBodySchema = z.object({
+  documentTypeIds: z.array(UuidSchema).min(1).max(10),
+  notes: z.string().max(1000).optional(),
+});
+
+export async function closeWithDocuments(req: Request<{ id: string }>, res: Response) {
+  if (!req.user) throw new UnauthorizedError('Authentication required');
+
+  const files = req.files as Express.Multer.File[];
+  if (!files || files.length === 0) {
+    throw new BadRequestError('At least one document file is required');
+  }
+
+  const rawIds: unknown = req.body.documentTypeIds;
+  const documentTypeIds = Array.isArray(rawIds) ? rawIds : rawIds ? [rawIds] : [];
+
+  const parsed = CloseWithDocumentsBodySchema.safeParse({
+    documentTypeIds,
+    notes: req.body.notes,
+  });
+
+  if (!parsed.success) {
+    throw new ValidationError(
+      parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))
+    );
+  }
+
+  const data = await service.closeWithDocuments(
+    req.params.id,
+    req.user,
+    files,
+    parsed.data.documentTypeIds,
+    parsed.data.notes
+  );
+
   res.json({ success: true, data });
 }

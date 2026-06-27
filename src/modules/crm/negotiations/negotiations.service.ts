@@ -4,6 +4,7 @@ import type {
   ListNegotiationsQuery,
   UpdateNegotiationRequest,
 } from '@bopacorp/shared/crm';
+import { env } from '@config/env.js';
 import { users } from '@db/schema/auth.js';
 import { employees, profiles } from '@db/schema/core.js';
 import {
@@ -12,11 +13,19 @@ import {
   negotiationStates,
   negotiations,
 } from '@db/schema/crm.js';
+import { documentStateHistory, documentTypes, negotiationDocuments } from '@db/schema/documents.js';
 import { salesTargets } from '@db/schema/reports.js';
 import { db } from '@lib/db.js';
-import { NotFoundError } from '@shared/errors/http-error.js';
+import { deleteFile } from '@lib/storage.js';
+import { uploadEncryptedDocument } from '@modules/document-uploads/document-uploads.service.js';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '@shared/errors/http-error.js';
 import type { AnyColumn } from 'drizzle-orm';
-import { and, asc, eq, gte, ilike, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { formatDateTime, getOrderBy } from '../crm.helpers.js';
 
 function getSortColumn(sortBy?: string): AnyColumn {
@@ -381,4 +390,144 @@ export async function getNegotiationHistory(id: string) {
     notes: h.notes,
     createdAt: formatDateTime(h.createdAt),
   }));
+}
+
+export async function closeWithDocuments(
+  negotiationId: string,
+  user: NonNullable<Express.Request['user']>,
+  files: Express.Multer.File[],
+  documentTypeIds: string[],
+  notes?: string
+) {
+  if (files.length !== documentTypeIds.length) {
+    throw new BadRequestError('Each file must have a corresponding document type ID');
+  }
+
+  const negotiation = await getNegotiationById(negotiationId);
+
+  if (user.roles.includes('advisor') && negotiation.advisor.id !== user.id) {
+    throw new ForbiddenError('You can only close your own negotiations');
+  }
+
+  const closingState = await db.query.negotiationStates.findFirst({
+    where: eq(negotiationStates.code, 'closing'),
+  });
+  if (!closingState) {
+    throw new NotFoundError('Negotiation state', 'closing');
+  }
+
+  if (negotiation.state.id === closingState.id) {
+    throw new ConflictError('Negotiation is already in closing state');
+  }
+
+  const requestedTypes = await db
+    .select({ id: documentTypes.id, code: documentTypes.code, name: documentTypes.name })
+    .from(documentTypes)
+    .where(inArray(documentTypes.id, documentTypeIds));
+
+  if (requestedTypes.length !== new Set(documentTypeIds).size) {
+    throw new BadRequestError('One or more document type IDs are invalid');
+  }
+
+  const mandatoryTypes = await db
+    .select({ id: documentTypes.id, code: documentTypes.code, name: documentTypes.name })
+    .from(documentTypes)
+    .where(and(eq(documentTypes.isMandatory, true), eq(documentTypes.isActive, true)));
+
+  const existingDocs = await db
+    .select({ documentTypeId: negotiationDocuments.documentTypeId })
+    .from(negotiationDocuments)
+    .where(
+      and(
+        eq(negotiationDocuments.negotiationId, negotiationId),
+        isNull(negotiationDocuments.deletedAt)
+      )
+    );
+
+  const coveredTypeIds = new Set([
+    ...existingDocs.map((d) => d.documentTypeId),
+    ...documentTypeIds,
+  ]);
+
+  const missingTypes = mandatoryTypes.filter((t) => !coveredTypeIds.has(t.id));
+  if (missingTypes.length > 0) {
+    const names = missingTypes.map((t) => t.name).join(', ');
+    throw new BadRequestError(`Missing mandatory documents: ${names}`);
+  }
+
+  const uploadResults: Awaited<ReturnType<typeof uploadEncryptedDocument>>[] = [];
+  const uploadedPaths: string[] = [];
+
+  try {
+    for (const file of files) {
+      const result = await uploadEncryptedDocument(file, user.id);
+      uploadResults.push(result);
+      uploadedPaths.push(result.storagePath);
+    }
+  } catch (error) {
+    await Promise.allSettled(
+      uploadedPaths.map((path) => deleteFile(path, env.DOCUMENTS_STORAGE_BUCKET))
+    );
+    throw error;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .select({ id: negotiations.id })
+        .from(negotiations)
+        .where(eq(negotiations.id, negotiationId))
+        .for('update');
+
+      for (let i = 0; i < uploadResults.length; i++) {
+        const upload = uploadResults[i];
+        const typeId = documentTypeIds[i];
+        if (!upload || !typeId) continue;
+
+        const [doc] = await tx
+          .insert(negotiationDocuments)
+          .values({
+            negotiationId,
+            documentTypeId: typeId,
+            uploadedBy: user.id,
+            filename: upload.filename,
+            fileExtension: upload.fileExtension,
+            fileSizeMb: upload.fileSizeMb.toString(),
+            storagePath: upload.storagePath,
+            mimeType: upload.mimeType,
+            encryptionMetadata: upload.encryptionMetadata,
+          })
+          .returning({ id: negotiationDocuments.id });
+
+        if (doc) {
+          await tx.insert(documentStateHistory).values({
+            documentId: doc.id,
+            newState: 'PENDING_APPROVAL',
+            changedBy: user.id,
+            notes: 'Document uploaded',
+          });
+        }
+      }
+
+      await tx
+        .update(negotiations)
+        .set({ stateId: closingState.id, updatedAt: new Date() })
+        .where(eq(negotiations.id, negotiationId));
+
+      await tx.insert(negotiationStateHistory).values({
+        negotiationId,
+        previousStateId: negotiation.state.id,
+        newStateId: closingState.id,
+        changedBy: user.id,
+        notes,
+      });
+    });
+  } catch (error) {
+    await Promise.allSettled(
+      uploadedPaths.map((path) => deleteFile(path, env.DOCUMENTS_STORAGE_BUCKET))
+    );
+    throw error;
+  }
+
+  return getNegotiationById(negotiationId);
 }

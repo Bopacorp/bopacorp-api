@@ -66,3 +66,23 @@ const documentUpload = multer({
 });
 
 export const uploadSingleDocument = documentUpload.single('file');
+
+const CLOSING_DOC_MIMETYPES = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+
+const closingDocUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+    files: 10,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!CLOSING_DOC_MIMETYPES.has(file.mimetype)) {
+      return cb(
+        new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'Only PDF, PNG and JPEG files are allowed')
+      );
+    }
+    cb(null, true);
+  },
+});
+
+export const uploadMultipleClosingDocuments = closingDocUpload.array('files', 10);

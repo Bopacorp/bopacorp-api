@@ -6,6 +6,7 @@ import {
 } from '@bopacorp/shared/crm';
 import { authenticate } from '@shared/middleware/authenticate.js';
 import { authorize } from '@shared/middleware/authorize.js';
+import { uploadMultipleClosingDocuments } from '@shared/middleware/upload.js';
 import { validate } from '@shared/middleware/validate.js';
 import { IdParamSchema } from '@shared/schemas/params.js';
 import { Router } from 'express';
@@ -67,4 +68,13 @@ negotiationsRoutes.get(
   authorize('negotiations.read'),
   validate({ params: IdParamSchema }),
   controller.getNegotiationHistory
+);
+
+negotiationsRoutes.post(
+  '/:id/close-with-documents',
+  authenticate,
+  authorize('negotiations.change_state'),
+  validate({ params: IdParamSchema }),
+  uploadMultipleClosingDocuments,
+  controller.closeWithDocuments
 );
