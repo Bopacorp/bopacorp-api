@@ -135,9 +135,14 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
     'document_types.read',
 
+    'offer_matrices.create',
     'offer_matrices.read',
+    'offer_matrices.update',
+    'offer_matrices.delete',
 
+    'matrix_attachments.create',
     'matrix_attachments.read',
+    'matrix_attachments.delete',
 
     'notifications.create',
     'notifications.read',
@@ -155,6 +160,23 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
     'departments.read',
     'org_roles.read',
+
+    'catalog_items.create',
+    'catalog_items.read',
+    'catalog_items.update',
+    'catalog_items.delete',
+
+    'categories.create',
+    'categories.read',
+    'categories.update',
+    'categories.delete',
+
+    'item_types.read',
+    'contract_types.read',
+    'segments.read',
+    'tiers.read',
+    'geo_zones.read',
+    'benefit_types.read',
 
     'contact_requests.read',
     'contact_requests.update',
@@ -273,6 +295,21 @@ for (const [roleSlug, permCodes] of Object.entries(ROLE_PERMISSIONS)) {
     .onConflictDoNothing({ target: [rolePermissions.roleId, rolePermissions.permissionId] });
 
   process.stdout.write(`${roleSlug}: ${permCodes.length} permissions assigned\n`);
+}
+
+const adminRole = await db.query.roles.findFirst({ where: eq(roles.slug, 'admin') });
+if (adminRole) {
+  const allPerms = await db.select({ id: permissions.id }).from(permissions);
+  const adminValues = allPerms.map((p) => ({
+    roleId: adminRole.id,
+    permissionId: p.id,
+    isGranted: true,
+  }));
+  await db
+    .insert(rolePermissions)
+    .values(adminValues)
+    .onConflictDoNothing({ target: [rolePermissions.roleId, rolePermissions.permissionId] });
+  process.stdout.write(`admin: ${allPerms.length} permissions assigned (all)\n`);
 }
 
 process.stdout.write('Role permissions seed completed.\n');
