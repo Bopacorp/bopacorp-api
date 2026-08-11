@@ -34,7 +34,7 @@ describe('unlockUser', () => {
       id: USER_ID,
       isActive: true,
       failedLoginAttempts: 3,
-      lockedUntil: new Date('2026-08-11T12:00:00.000Z'),
+      lockedUntil: new Date('2099-08-11T12:00:00.000Z'),
     });
 
     const result = await unlockUser(ADMIN_ID, USER_ID, { reason: 'Identity verified' }, clientInfo);
@@ -64,6 +64,27 @@ describe('unlockUser', () => {
       id: USER_ID,
       isActive: true,
       failedLoginAttempts: 0,
+      lockedUntil: null,
+    });
+
+    const result = await unlockUser(ADMIN_ID, USER_ID, { reason: 'Routine review' }, clientInfo);
+
+    expect(result).toEqual({
+      id: USER_ID,
+      unlocked: false,
+      message: 'User account was not locked',
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ oldData: { wasLocked: false }, newData: { unlocked: false } })
+    );
+  });
+
+  it('does not reset failed attempts for an active user without a current lock', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: USER_ID,
+      isActive: true,
+      failedLoginAttempts: 2,
       lockedUntil: null,
     });
 

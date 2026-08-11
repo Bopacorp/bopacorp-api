@@ -344,7 +344,7 @@ export async function unlockUser(
     throw new ConflictError('Cannot unlock a deactivated user');
   }
 
-  const unlocked = user.failedLoginAttempts > 0 || user.lockedUntil !== null;
+  const unlocked = user.lockedUntil !== null && user.lockedUntil > new Date();
 
   if (unlocked) {
     await db
