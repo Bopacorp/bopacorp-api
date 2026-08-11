@@ -2,6 +2,7 @@ import type {
   AssignUserRolesRequest,
   CreateUserRequest,
   ListUsersQuery,
+  UnlockUserRequest,
   UpdateUserRequest,
 } from '@bopacorp/shared/auth';
 import { UnauthorizedError } from '@shared/errors/http-error.js';
@@ -40,6 +41,19 @@ export async function update(req: Request<{ id: string }>, res: Response) {
     req.user.id,
     req.params.id,
     req.body as UpdateUserRequest,
+    getClientInfo(req)
+  );
+  res.json({ success: true, data });
+}
+
+export async function unlock(req: Request<{ id: string }>, res: Response) {
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required');
+  }
+  const data = await service.unlockUser(
+    req.user.id,
+    req.params.id,
+    req.body as UnlockUserRequest,
     getClientInfo(req)
   );
   res.json({ success: true, data });

@@ -2,6 +2,7 @@ import {
   AssignUserRolesRequestSchema,
   CreateUserRequestSchema,
   ListUsersQuerySchema,
+  UnlockUserRequestSchema,
   UpdateUserRequestSchema,
 } from '@bopacorp/shared/auth';
 import { authorize } from '@shared/middleware/authorize.js';
@@ -38,6 +39,13 @@ usersRoutes.patch(
   authorize('users.update'),
   validate({ params: IdParamSchema, body: UpdateUserRequestSchema }),
   controller.update
+);
+
+usersRoutes.post(
+  '/:id/unlock',
+  authorize('users.unlock'),
+  validate({ params: IdParamSchema, body: UnlockUserRequestSchema }),
+  controller.unlock
 );
 
 usersRoutes.delete(

@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { permissions, rolePermissions, roles } from '@db/schema/auth.js';
+import { modules, permissions, rolePermissions, roles } from '@db/schema/auth.js';
 import { closeDb, db } from '@lib/db.js';
 import { eq, inArray, sql } from 'drizzle-orm';
 
@@ -16,6 +16,8 @@ await db.execute(
 );
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: ['users.unlock'],
+
   advisor: [
     'business_clients.create',
     'business_clients.read',
@@ -108,6 +110,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 
   manager: [
+    'users.unlock',
+
     'business_clients.create',
     'business_clients.read',
     'business_clients.update',
@@ -242,6 +246,20 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'notifications.update',
   ],
 };
+
+const usersModule = await db.query.modules.findFirst({ where: eq(modules.code, 'users') });
+const usersModuleId = required(usersModule, 'module:users').id;
+
+await db
+  .insert(permissions)
+  .values({
+    moduleId: usersModuleId,
+    code: 'users.unlock',
+    name: 'Unlock user',
+    description: 'Clear temporary failed-login lock',
+    type: 'action',
+  })
+  .onConflictDoNothing({ target: permissions.code });
 
 const allPermCodes = [...new Set(Object.values(ROLE_PERMISSIONS).flat())];
 

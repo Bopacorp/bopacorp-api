@@ -72,7 +72,6 @@ function calculateLockoutDuration(attempts: number): number {
   if (attempts >= 7) return 30 * 60;
   if (attempts >= 5) return 15 * 60;
   if (attempts >= 3) return 5 * 60;
-  if (attempts >= 2) return 1 * 60;
   return 0;
 }
 
@@ -184,10 +183,7 @@ export const authService = {
     }
 
     if (user.lockedUntil && new Date(user.lockedUntil) <= new Date()) {
-      await db
-        .update(users)
-        .set({ lockedUntil: null, failedLoginAttempts: 0 })
-        .where(eq(users.id, user.id));
+      await db.update(users).set({ lockedUntil: null }).where(eq(users.id, user.id));
     }
 
     const passwordValid = await bcrypt.compare(data.password, user.passwordHash);
@@ -419,7 +415,10 @@ export const authService = {
 
     const passwordHash = await bcrypt.hash(data.newPassword, BCRYPT_SALT_ROUNDS);
 
-    await db.update(users).set({ passwordHash }).where(eq(users.id, user.id));
+    await db
+      .update(users)
+      .set({ passwordHash, failedLoginAttempts: 0, lockedUntil: null })
+      .where(eq(users.id, user.id));
 
     await db
       .delete(authTokens)

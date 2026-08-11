@@ -1,4 +1,9 @@
-import type { CreateUserRequest, ListUsersQuery, UpdateUserRequest } from '@bopacorp/shared/auth';
+import type {
+  CreateUserRequest,
+  ListUsersQuery,
+  UnlockUserRequest,
+  UpdateUserRequest,
+} from '@bopacorp/shared/auth';
 import { roles, userRoles, users } from '@db/schema/auth.js';
 import { profiles } from '@db/schema/core.js';
 import { createAuditLog } from '@lib/audit.js';
@@ -313,6 +318,57 @@ export async function updateUser(
   });
 
   return getUserById(id);
+}
+
+export async function unlockUser(
+  adminId: string,
+  id: string,
+  data: UnlockUserRequest,
+  clientInfo: { ipAddress?: string; userAgent?: string }
+) {
+  const user = await db.query.users.findFirst({
+    where: and(eq(users.id, id), isNull(users.deletedAt)),
+    columns: {
+      id: true,
+      isActive: true,
+      failedLoginAttempts: true,
+      lockedUntil: true,
+    },
+  });
+
+  if (!user) {
+    throw new NotFoundError('User', id);
+  }
+
+  if (!user.isActive) {
+    throw new ConflictError('Cannot unlock a deactivated user');
+  }
+
+  const unlocked = user.failedLoginAttempts > 0 || user.lockedUntil !== null;
+
+  if (unlocked) {
+    await db
+      .update(users)
+      .set({ failedLoginAttempts: 0, lockedUntil: null, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  await createAuditLog({
+    tableName: 'users',
+    recordId: id,
+    operation: 'U',
+    userId: adminId,
+    oldData: { wasLocked: unlocked },
+    newData: { unlocked },
+    notes: data.reason,
+    ...clientInfo,
+  });
+
+  return {
+    id,
+    unlocked,
+    message: unlocked ? 'User account unlocked' : 'User account was not locked',
+  };
 }
 
 export async function deleteUser(
