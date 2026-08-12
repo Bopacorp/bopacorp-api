@@ -21,6 +21,8 @@
     "seed:cms:site-config": "tsx src/scripts/seed-cms-site-config.ts",
     "seed:role-permissions": "tsx src/scripts/seed-role-permissions.ts",
     "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "prepare": "husky"
   },
