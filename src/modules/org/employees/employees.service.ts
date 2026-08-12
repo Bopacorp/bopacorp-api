@@ -42,6 +42,8 @@ function buildEmployeeQuery() {
       deletedAt: employees.deletedAt,
       userUsername: users.username,
       userEmail: users.email,
+      userIsActive: users.isActive,
+      userLockedUntil: users.lockedUntil,
       profileFirstName: profiles.firstName,
       profileLastName: profiles.lastName,
       profileAvatarUrl: profiles.avatarUrl,
@@ -92,7 +94,10 @@ function toEmployeeResponse(row: EmployeeRow) {
   };
 }
 
-function toEmployeeListItem(row: EmployeeRow) {
+function toEmployeeListItem(row: EmployeeRow, includeLockStatus: boolean) {
+  const isLocked =
+    row.userIsActive === true && row.userLockedUntil !== null && row.userLockedUntil > new Date();
+
   return {
     userId: row.userId,
     user: {
@@ -109,6 +114,7 @@ function toEmployeeListItem(row: EmployeeRow) {
     territory: row.territory,
     hiredAt: row.hiredAt,
     isActive: row.isActive,
+    ...(includeLockStatus ? { isLocked } : {}),
     createdAt: row.createdAt ? row.createdAt.toISOString() : '',
     updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
   };
@@ -167,7 +173,7 @@ export async function listEmployees(query: ListEmployeesQuery) {
     .offset((query.page - 1) * query.limit);
 
   return {
-    data: rows.map(toEmployeeListItem),
+    data: rows.map((row) => toEmployeeListItem(row, query.includeLockStatus === true)),
     meta: { page: query.page, limit: query.limit, totalItems, totalPages },
   };
 }

@@ -21,6 +21,13 @@ usersRoutes.get(
 );
 
 usersRoutes.get(
+  '/:id/lock-status',
+  authorize('users.unlock'),
+  validate({ params: IdParamSchema }),
+  controller.getLockStatus
+);
+
+usersRoutes.get(
   '/:id',
   authorize('users.read'),
   validate({ params: IdParamSchema }),

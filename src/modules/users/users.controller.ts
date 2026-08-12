@@ -21,6 +21,11 @@ export async function getById(req: Request<{ id: string }>, res: Response) {
   res.json({ success: true, data });
 }
 
+export async function getLockStatus(req: Request<{ id: string }>, res: Response) {
+  const data = await service.getUserLockStatus(req.params.id);
+  res.json({ success: true, data });
+}
+
 export async function create(req: Request, res: Response) {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required');

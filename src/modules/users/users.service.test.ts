@@ -17,7 +17,7 @@ vi.mock('@lib/db.js', () => ({
 
 vi.mock('@lib/audit.js', () => ({ createAuditLog: mockCreateAuditLog }));
 
-const { unlockUser } = await import('./users.service.js');
+const { getUserLockStatus, unlockUser } = await import('./users.service.js');
 
 const ADMIN_ID = '11111111-1111-1111-1111-111111111111';
 const USER_ID = '22222222-2222-2222-2222-222222222222';
@@ -124,5 +124,47 @@ describe('unlockUser', () => {
     ).rejects.toThrow(ConflictError);
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockCreateAuditLog).not.toHaveBeenCalled();
+  });
+});
+
+describe('getUserLockStatus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the future lock expiry for an active locked account', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: USER_ID,
+      isActive: true,
+      lockedUntil: new Date('2099-08-11T12:00:00.000Z'),
+    });
+
+    await expect(getUserLockStatus(USER_ID)).resolves.toEqual({
+      id: USER_ID,
+      isActive: true,
+      isLocked: true,
+      lockedUntil: '2099-08-11T12:00:00.000Z',
+    });
+  });
+
+  it('hides expired lock data', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: USER_ID,
+      isActive: true,
+      lockedUntil: new Date('2026-01-01T12:00:00.000Z'),
+    });
+
+    await expect(getUserLockStatus(USER_ID)).resolves.toEqual({
+      id: USER_ID,
+      isActive: true,
+      isLocked: false,
+      lockedUntil: null,
+    });
+  });
+
+  it('rejects a missing user', async () => {
+    mockFindFirst.mockResolvedValue(undefined);
+
+    await expect(getUserLockStatus(USER_ID)).rejects.toThrow(NotFoundError);
   });
 });

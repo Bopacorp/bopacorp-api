@@ -173,6 +173,31 @@ export async function getUserById(id: string) {
   };
 }
 
+export async function getUserLockStatus(id: string) {
+  const user = await db.query.users.findFirst({
+    where: and(eq(users.id, id), isNull(users.deletedAt)),
+    columns: {
+      id: true,
+      isActive: true,
+      lockedUntil: true,
+    },
+  });
+
+  if (!user) {
+    throw new NotFoundError('User', id);
+  }
+
+  const lockedUntil = user.lockedUntil;
+  const isLocked = user.isActive && lockedUntil !== null && lockedUntil > new Date();
+
+  return {
+    id: user.id,
+    isActive: user.isActive,
+    isLocked,
+    lockedUntil: isLocked && lockedUntil ? lockedUntil.toISOString() : null,
+  };
+}
+
 export async function createUser(
   adminId: string,
   data: CreateUserRequest,

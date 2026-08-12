@@ -97,10 +97,13 @@ export async function closeWithDocuments(req: Request<{ id: string }>, res: Resp
   res.json({ success: true, data });
 }
 
-export async function downloadDocuments(req: Request<{ id: string }>, res: Response) {
+export async function downloadDocuments(
+  req: Request<{ id: string }, unknown, unknown, { status?: string }>,
+  res: Response
+) {
   if (!req.user) throw new UnauthorizedError('Authentication required');
 
-  const status = typeof req.query['status'] === 'string' ? req.query['status'] : undefined;
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
   const { archive, negotiationId } = await downloadNegotiationDocuments(
     req.params.id,
     req.user,

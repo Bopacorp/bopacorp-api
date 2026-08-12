@@ -3,13 +3,23 @@ import type {
   ListEmployeesQuery,
   UpdateEmployeeRequest,
 } from '@bopacorp/shared/core';
-import { UnauthorizedError } from '@shared/errors/http-error.js';
+import { ForbiddenError, UnauthorizedError } from '@shared/errors/http-error.js';
 import { getClientInfo } from '@shared/utils/request.js';
 import type { Request, Response } from 'express';
 import * as service from './employees.service.js';
 
 export async function listEmployees(req: Request, res: Response) {
   const query = req.query as unknown as ListEmployeesQuery;
+
+  if (query.includeLockStatus) {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+    if (!req.user.permissions.includes('users.unlock')) {
+      throw new ForbiddenError();
+    }
+  }
+
   const result = await service.listEmployees(query);
   res.json({ success: true, data: result.data, meta: result.meta });
 }
