@@ -2,6 +2,7 @@ import type {
   CreateUserRequest,
   ListUsersQuery,
   UnlockUserRequest,
+  UnlockUserResponse,
   UpdateUserRequest,
 } from '@bopacorp/shared/auth';
 import { roles, userRoles, users } from '@db/schema/auth.js';
@@ -350,7 +351,7 @@ export async function unlockUser(
   id: string,
   data: UnlockUserRequest,
   clientInfo: { ipAddress?: string; userAgent?: string }
-) {
+): Promise<UnlockUserResponse> {
   const user = await db.query.users.findFirst({
     where: and(eq(users.id, id), isNull(users.deletedAt)),
     columns: {

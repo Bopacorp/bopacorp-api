@@ -5,6 +5,7 @@ import type {
   UnlockUserRequest,
   UpdateUserRequest,
 } from '@bopacorp/shared/auth';
+import { UnlockUserResponseSchema } from '@bopacorp/shared/auth';
 import { UnauthorizedError } from '@shared/errors/http-error.js';
 import { getClientInfo } from '@shared/utils/request.js';
 import type { Request, Response } from 'express';
@@ -55,11 +56,13 @@ export async function unlock(req: Request<{ id: string }>, res: Response) {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required');
   }
-  const data = await service.unlockUser(
-    req.user.id,
-    req.params.id,
-    req.body as UnlockUserRequest,
-    getClientInfo(req)
+  const data = UnlockUserResponseSchema.parse(
+    await service.unlockUser(
+      req.user.id,
+      req.params.id,
+      req.body as UnlockUserRequest,
+      getClientInfo(req)
+    )
   );
   res.json({ success: true, data });
 }
