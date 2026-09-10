@@ -75,6 +75,45 @@ function listBuilder(result: unknown) {
   return builder;
 }
 
+function hasQueryValue(
+  expression: unknown,
+  expected: unknown,
+  seen = new WeakSet<object>()
+): boolean {
+  if (expression === expected) return true;
+  if (expression instanceof Date && expected instanceof Date) {
+    return expression.getTime() === expected.getTime();
+  }
+  if (!expression || typeof expression !== 'object' || seen.has(expression)) return false;
+  seen.add(expression);
+  const candidate = expression as { value?: unknown; queryChunks?: unknown[] };
+  if (
+    candidate.value === expected ||
+    (Array.isArray(candidate.value) && candidate.value.includes(expected))
+  ) {
+    return true;
+  }
+  return Object.values(candidate).some((value) =>
+    Array.isArray(value)
+      ? value.some((child) => hasQueryValue(child, expected, seen))
+      : hasQueryValue(value, expected, seen)
+  );
+}
+
+function hasColumnName(
+  expression: unknown,
+  expected: string,
+  seen = new WeakSet<object>()
+): boolean {
+  if (!expression || typeof expression !== 'object' || seen.has(expression)) return false;
+  seen.add(expression);
+  const candidate = expression as { name?: unknown; queryChunks?: unknown[] };
+  return (
+    candidate.name === expected ||
+    candidate.queryChunks?.some((chunk) => hasColumnName(chunk, expected, seen)) === true
+  );
+}
+
 function insertResult(result: unknown) {
   const returning = vi.fn().mockResolvedValue(result);
   const values = vi.fn().mockReturnValue({ returning });
@@ -206,12 +245,36 @@ describe('vacancies service', () => {
     expect(removeSet).toHaveBeenCalledWith({ deletedAt: NOW });
   });
 
-  it('lists and gets published vacancies with closing-date filtering', async () => {
-    mockCount.mockResolvedValue(1);
-    mockSelect.mockReturnValueOnce(listBuilder([listRow()]));
-    await expect(service.listPublishedVacancies({ page: 1, limit: 10 } as never)).resolves.toEqual(
-      expect.objectContaining({ data: [expect.objectContaining({ id: VACANCY_ID })] })
-    );
+  it('lists and gets published vacancies with public filters and deterministic pagination', async () => {
+    mockCount.mockResolvedValue(3);
+    const rowsBuilder = listBuilder([listRow()]);
+    mockSelect.mockReturnValueOnce(rowsBuilder);
+    await expect(
+      service.listPublishedVacancies({
+        page: 2,
+        limit: 2,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      } as never)
+    ).resolves.toEqual({
+      data: [expect.objectContaining({ id: VACANCY_ID })],
+      meta: { page: 2, limit: 2, totalItems: 3, totalPages: 2 },
+    });
+
+    const listWhere = rowsBuilder.where.mock.calls[0]?.[0];
+    expect(mockCount).toHaveBeenCalledWith(jobVacancies, listWhere);
+    expect(hasColumnName(listWhere, 'publication_date')).toBe(true);
+    expect(hasColumnName(listWhere, 'closing_date')).toBe(true);
+    expect(hasQueryValue(listWhere, NOW)).toBe(true);
+    expect(rowsBuilder.limit).toHaveBeenCalledWith(2);
+    expect(rowsBuilder.offset).toHaveBeenCalledWith(2);
+
+    const order = rowsBuilder.orderBy.mock.calls[0] ?? [];
+    expect(order).toHaveLength(2);
+    expect(hasColumnName(order[0], 'created_at')).toBe(true);
+    expect(hasQueryValue(order[0], ' desc')).toBe(true);
+    expect(hasColumnName(order[1], 'id')).toBe(true);
+    expect(hasQueryValue(order[1], ' desc')).toBe(true);
 
     mockFindFirst.mockResolvedValueOnce(vacancy());
     await expect(service.getPublishedVacancyById(VACANCY_ID)).resolves.toEqual(
@@ -220,13 +283,38 @@ describe('vacancies service', () => {
         closingDate: '2026-12-31T00:00:00.000Z',
       })
     );
+    const detailWhere = mockFindFirst.mock.calls[0]?.[0]?.where;
+    expect(hasColumnName(detailWhere, 'publication_date')).toBe(true);
+    expect(hasColumnName(detailWhere, 'closing_date')).toBe(true);
+    expect(hasQueryValue(detailWhere, NOW)).toBe(true);
 
-    mockFindFirst.mockResolvedValueOnce(vacancy({ creator: null, closingDate: null }));
+    mockFindFirst.mockResolvedValueOnce(
+      vacancy({ creator: null, publicationDate: null, closingDate: null })
+    );
     await expect(service.getPublishedVacancyById(VACANCY_ID)).resolves.toEqual(
       expect.objectContaining({ creator: { id: '', username: '' }, closingDate: null })
     );
 
     mockFindFirst.mockResolvedValueOnce(undefined);
     await expect(service.getPublishedVacancyById(VACANCY_ID)).rejects.toThrow(NotFoundError);
+  });
+
+  it('honors the requested sort column for published vacancies', async () => {
+    mockCount.mockResolvedValue(0);
+    const rowsBuilder = listBuilder([]);
+    mockSelect.mockReturnValueOnce(rowsBuilder);
+
+    await service.listPublishedVacancies({
+      page: 1,
+      limit: 10,
+      sortBy: 'title',
+      sortOrder: 'asc',
+    } as never);
+
+    const order = rowsBuilder.orderBy.mock.calls[0] ?? [];
+    expect(order).toHaveLength(2);
+    expect(hasColumnName(order[0], 'title')).toBe(true);
+    expect(hasQueryValue(order[0], ' asc')).toBe(true);
+    expect(hasColumnName(order[1], 'id')).toBe(true);
   });
 });

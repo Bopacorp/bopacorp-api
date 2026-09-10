@@ -9,7 +9,7 @@ import {
 import { db } from '@lib/db.js';
 import { deleteFile, uploadFile } from '@lib/storage.js';
 import { InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, or } from 'drizzle-orm';
 
 export async function applyJobVacancy(
   data: ApplyJobVacancyRequest,
@@ -18,12 +18,15 @@ export async function applyJobVacancy(
   fileSizeBytes: number,
   mimeType: string
 ) {
+  const now = new Date();
   const vacancy = await db.query.jobVacancies.findFirst({
     where: and(
       eq(jobVacancies.id, data.vacancyId),
       eq(jobVacancies.isPublished, true),
       eq(jobVacancies.isActive, true),
-      isNull(jobVacancies.deletedAt)
+      isNull(jobVacancies.deletedAt),
+      or(isNull(jobVacancies.publicationDate), lte(jobVacancies.publicationDate, now)),
+      or(isNull(jobVacancies.closingDate), gte(jobVacancies.closingDate, now))
     ),
   });
 

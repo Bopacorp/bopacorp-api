@@ -1,6 +1,6 @@
 import { candidateResumes, candidates, jobApplications } from '@db/schema/employability.js';
 import { InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockInsert = vi.fn();
 const mockTransaction = vi.fn();
@@ -31,6 +31,7 @@ const CANDIDATE_ID = '22222222-2222-2222-2222-222222222222';
 const APPLICATION_ID = '33333333-3333-3333-3333-333333333333';
 const RESUME_ID = '44444444-4444-4444-4444-444444444444';
 const APPLIED_AT = new Date('2026-08-14T12:00:00.000Z');
+const NOW = new Date('2026-08-14T12:00:00.000Z');
 
 const applyData = {
   vacancyId: VACANCY_ID,
@@ -45,8 +46,17 @@ const applyData = {
   coverLetter: 'I would love to join the team',
 };
 
-function vacancy() {
-  return { id: VACANCY_ID, title: 'Backend Engineer' };
+function vacancy(overrides: Record<string, unknown> = {}) {
+  return {
+    id: VACANCY_ID,
+    title: 'Backend Engineer',
+    isPublished: true,
+    isActive: true,
+    publicationDate: new Date('2026-08-01T00:00:00.000Z'),
+    closingDate: new Date('2026-12-31T00:00:00.000Z'),
+    deletedAt: null,
+    ...overrides,
+  };
 }
 
 function insertResult(result: unknown) {
@@ -75,12 +85,55 @@ function transaction(resumeResult: unknown[], applicationResult: unknown[]) {
   return tx;
 }
 
+function hasQueryValue(
+  expression: unknown,
+  expected: unknown,
+  seen = new WeakSet<object>()
+): boolean {
+  if (expression === expected) return true;
+  if (expression instanceof Date && expected instanceof Date) {
+    return expression.getTime() === expected.getTime();
+  }
+  if (!expression || typeof expression !== 'object' || seen.has(expression)) return false;
+  seen.add(expression);
+  const candidate = expression as { value?: unknown; queryChunks?: unknown[] };
+  if (
+    candidate.value === expected ||
+    (Array.isArray(candidate.value) && candidate.value.includes(expected))
+  ) {
+    return true;
+  }
+  return Object.values(candidate).some((value) =>
+    Array.isArray(value)
+      ? value.some((child) => hasQueryValue(child, expected, seen))
+      : hasQueryValue(value, expected, seen)
+  );
+}
+
+function hasColumnName(
+  expression: unknown,
+  expected: string,
+  seen = new WeakSet<object>()
+): boolean {
+  if (!expression || typeof expression !== 'object' || seen.has(expression)) return false;
+  seen.add(expression);
+  const candidate = expression as { name?: unknown; queryChunks?: unknown[] };
+  return (
+    candidate.name === expected ||
+    candidate.queryChunks?.some((chunk) => hasColumnName(chunk, expected, seen)) === true
+  );
+}
+
 describe('public apply service', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
   });
 
-  it('rejects applications for vacancies that are not publicly available', async () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('rejects applications outside the public availability window', async () => {
     mockFindVacancy.mockResolvedValue(undefined);
 
     await expect(
@@ -92,6 +145,10 @@ describe('public apply service', () => {
         'application/pdf'
       )
     ).rejects.toThrow(NotFoundError);
+    const where = mockFindVacancy.mock.calls[0]?.[0]?.where;
+    expect(hasColumnName(where, 'publication_date')).toBe(true);
+    expect(hasColumnName(where, 'closing_date')).toBe(true);
+    expect(hasQueryValue(where, NOW)).toBe(true);
     expect(mockFindCandidate).not.toHaveBeenCalled();
     expect(mockUploadFile).not.toHaveBeenCalled();
   });

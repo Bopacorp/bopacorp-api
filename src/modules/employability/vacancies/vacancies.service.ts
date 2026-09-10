@@ -8,7 +8,28 @@ import { users } from '@db/schema/auth.js';
 import { jobVacancies } from '@db/schema/employability.js';
 import { db } from '@lib/db.js';
 import { InternalServerError, NotFoundError } from '@shared/errors/http-error.js';
-import { and, eq, gte, ilike, isNull, or } from 'drizzle-orm';
+import { type AnyColumn, and, asc, desc, eq, gte, ilike, isNull, lte, or } from 'drizzle-orm';
+
+function getVacancySortColumn(sortBy?: string): AnyColumn {
+  const map: Record<string, AnyColumn> = {
+    title: jobVacancies.title,
+    publicationDate: jobVacancies.publicationDate,
+    closingDate: jobVacancies.closingDate,
+    createdAt: jobVacancies.createdAt,
+    updatedAt: jobVacancies.updatedAt,
+  };
+  return (sortBy && map[sortBy]) || jobVacancies.createdAt;
+}
+
+function getPublicVacancyWhere(now: Date) {
+  return and(
+    eq(jobVacancies.isPublished, true),
+    eq(jobVacancies.isActive, true),
+    isNull(jobVacancies.deletedAt),
+    or(isNull(jobVacancies.publicationDate), lte(jobVacancies.publicationDate, now)),
+    or(isNull(jobVacancies.closingDate), gte(jobVacancies.closingDate, now))
+  );
+}
 
 export async function listVacancies(query: ListJobVacanciesQuery) {
   const conditions = [isNull(jobVacancies.deletedAt)];
@@ -143,15 +164,12 @@ export async function removeVacancy(id: string) {
 
 export async function listPublishedVacancies(query: ListJobVacanciesQuery) {
   const now = new Date();
-  const where = and(
-    eq(jobVacancies.isPublished, true),
-    eq(jobVacancies.isActive, true),
-    isNull(jobVacancies.deletedAt),
-    or(isNull(jobVacancies.closingDate), gte(jobVacancies.closingDate, now))
-  );
+  const where = getPublicVacancyWhere(now);
 
   const totalItems = await db.$count(jobVacancies, where);
   const totalPages = Math.ceil(totalItems / query.limit);
+  const sortColumn = getVacancySortColumn(query.sortBy);
+  const orderFn = query.sortOrder === 'desc' ? desc : asc;
 
   const rows = await db
     .select({
@@ -170,7 +188,7 @@ export async function listPublishedVacancies(query: ListJobVacanciesQuery) {
     .where(where)
     .limit(query.limit)
     .offset((query.page - 1) * query.limit)
-    .orderBy(jobVacancies.createdAt);
+    .orderBy(orderFn(sortColumn), orderFn(jobVacancies.id));
 
   return {
     data: rows.map((row) => ({
@@ -187,13 +205,7 @@ export async function listPublishedVacancies(query: ListJobVacanciesQuery) {
 export async function getPublishedVacancyById(id: string): Promise<PublicJobVacancyResponse> {
   const now = new Date();
   const vacancy = await db.query.jobVacancies.findFirst({
-    where: and(
-      eq(jobVacancies.id, id),
-      isNull(jobVacancies.deletedAt),
-      eq(jobVacancies.isPublished, true),
-      eq(jobVacancies.isActive, true),
-      or(isNull(jobVacancies.closingDate), gte(jobVacancies.closingDate, now))
-    ),
+    where: and(eq(jobVacancies.id, id), getPublicVacancyWhere(now)),
     with: { creator: true },
   });
 
