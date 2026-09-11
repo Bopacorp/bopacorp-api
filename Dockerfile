@@ -1,14 +1,14 @@
 FROM node:22-alpine AS builder
 
 WORKDIR /app
+ARG NPM_TOKEN
 
 COPY package.json package-lock.json ./
-RUN --mount=type=secret,id=NPM_TOKEN \
-    echo "@bopacorp:registry=https://npm.pkg.github.com" > .npmrc && \
-    echo "//npm.pkg.github.com/:_authToken=$(cat /run/secrets/NPM_TOKEN)" >> .npmrc && \
+RUN echo "@bopacorp:registry=https://npm.pkg.github.com" > .npmrc && \
+    echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc && \
     npm ci && \
     rm -f .npmrc
-    
+
 COPY tsconfig.json ./
 COPY src/ src/
 
