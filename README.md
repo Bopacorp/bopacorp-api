@@ -14,19 +14,22 @@ This API serves as the single backend powering two client applications:
 
 - **Runtime**: Node.js (v22+)
 - **Framework**: Express.js 5.x
-- **Language**: TypeScript 5.x
+- **Language**: TypeScript 6.x (ESM only)
 - **Database**: PostgreSQL (via Supabase)
-- **ORM**: Prisma
-- **Validation**: Zod
+- **ORM**: Drizzle ORM
+- **Validation**: Zod 4
 - **Authentication**: JWT with bcrypt
+- **Logging**: Pino
 - **Testing**: Vitest
+- **Linting/Formatting**: Biome
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js >= 22.0.0
-- PostgreSQL database (local or Supabase)
+- PostgreSQL database (Supabase)
+- Access to `@bopacorp/shared` package registry
 
 ### Installation
 
@@ -38,39 +41,35 @@ npm install
 cp .env.example .env
 # Edit .env with your database credentials
 
-# Set up database
-npx prisma migrate dev
-npx prisma generate
+# Apply database migrations
+npm run db:migrate
 
 # Start development server
 npm run dev
-```
-
-### Environment Variables
-
-Create a `.env` file with:
-
-```env
-DATABASE_URL="postgresql://user:password@host:5432/database"
-JWT_SECRET="your-secret-key-here"
-PORT=3000
-NODE_ENV=development
 ```
 
 ## Project Structure
 
 ```
 src/
-├── config/         # Configuration files
-├── lib/           # Shared libraries
-├── modules/       # Business domain modules
-├── shared/        # Cross-cutting concerns
-└── index.ts       # Application entry point
+├── config/         # Environment and app configuration
+├── db/schema/      # Drizzle ORM schema definitions
+├── lib/            # Singletons (db client, logger, storage)
+├── modules/        # Business domain modules
+│   ├── auth/
+│   ├── catalog/
+│   ├── cms/
+│   ├── crm/
+│   ├── documents/
+│   ├── employability/
+│   ├── notifications/
+│   ├── org/
+│   └── reports/
+├── shared/         # Middleware, errors, utils, types
+├── scripts/        # Database seeders
+└── index.ts        # Application entry point
 
-prisma/
-├── schema.prisma  # Database schema
-└── migrations/    # Database migrations
-generated/         # Generated Prisma client
+drizzle/            # Generated SQL migrations
 ```
 
 ## Available Scripts
@@ -79,8 +78,13 @@ generated/         # Generated Prisma client
 |---------|-------------|
 | `npm run dev` | Start development server |
 | `npm run build` | Compile TypeScript |
-| `npm start` | Start production server |
+| `npm run check` | Lint + format + typecheck |
+| `npm run lint` | Run Biome linter |
+| `npm run format` | Run Biome formatter |
 | `npm test` | Run tests |
+| `npm run db:generate` | Generate migration from schema |
+| `npm run db:migrate` | Apply migrations |
+| `npm run db:studio` | Open Drizzle Studio |
 
 ## Testing
 
@@ -88,33 +92,35 @@ generated/         # Generated Prisma client
 # Run all tests
 npm test
 
-# Run tests in watch mode
-npm test -- --watch
+# Run single test file
+npx vitest run src/path/to/file.test.ts
 
 # Run with coverage
-npm test -- --coverage
+npx vitest --coverage
 ```
 
 ## Documentation
 
-See `AGENTS.md` for detailed development guidelines and conventions.
+See `docs/` for detailed development guidelines:
+- `api-conventions.md` - API response format, error handling
+- `project-structure.md` - Module pattern, dependency rules
+- `auth.md` - Authentication and authorization
+- `drizzle-guide.md` - Database schema and ORM usage
+- `git-workflow.md` - Branching and commit conventions
 
 ## Security
 
 - Environment variables for sensitive data
-- JWT tokens with expiration
+- JWT tokens with expiration and role-based permissions
 - Password hashing with bcrypt
-- Input validation with Zod
+- Input validation with Zod schemas
+- Document encryption at rest (AES-256-GCM)
+- Rate limiting on public endpoints
 
 ## Team
 
-**Espol Developers** - Student development team at ESPOL
+**ESPOL Software Engineering II** - Student development team at ESPOL (T3)
 
 ## License
 
 ISC License
-
-## Support
-
-- **Repository**: https://github.com/Bopacorp/bopacorp-api
-- **Issues**: https://github.com/Bopacorp/bopacorp-api/issues
